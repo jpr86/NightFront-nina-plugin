@@ -20,11 +20,12 @@
     <None Remove="NightFront.Tests\**" />
   </ItemGroup>
   <ItemGroup>
-    <!-- ExcludeAssets="runtime": NINA.Plugin's own transitive graph is NINA's entire assembly set,
-         already loaded by the host process. Copying those locally too would risk the CLR treating
-         our plugin's private copies as distinct types from the host's (e.g. ISequenceItem),
-         breaking casts across the plugin/host boundary - keep it compile-time-only. -->
-    <PackageReference Include="NINA.Plugin" Version="3.0.0.2017-beta" ExcludeAssets="runtime" />
+    <!-- ExcludeAssets="runtime;native": NINA.Plugin's own transitive graph is NINA's entire assembly
+         set (plus native assets like SQLite/SqlClient/serial-port libraries for every OS/arch NuGet
+         restored), already provided by the host process. Copying those locally too would risk the
+         CLR treating our plugin's private copies as distinct types from the host's (e.g.
+         ISequenceItem), breaking casts across the plugin/host boundary - keep it compile-time-only. -->
+    <PackageReference Include="NINA.Plugin" Version="3.0.0.2017-beta" ExcludeAssets="runtime;native" />
     <PackageReference Include="Ookii.Dialogs.Wpf" Version="5.0.1" />
   </ItemGroup>
   <ItemGroup>
