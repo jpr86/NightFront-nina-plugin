@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="NightFront.csproj" />
+  <Project Path="NightFront.Tests\NightFront.Tests.csproj" />
+</Solution>
