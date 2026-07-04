@@ -11,11 +11,21 @@
         <PathGeometry Figures="M 263.627,115.083L 163.44,115.083C 163.44,123.458 164.69,130.729 167.211,136.938C 169.711,143.146 173.169,148.25 177.544,152.229C 181.752,156.125 186.773,159.042 192.586,161C 198.377,162.958 204.773,163.917 211.773,163.917C 221.023,163.917 230.336,162.083 239.711,158.375C 249.086,154.688 255.752,151.063 259.732,147.479L 260.94,147.479L 260.94,172.438C 253.232,175.688 245.357,178.396 237.315,180.583C 229.273,182.771 220.836,183.875 212.002,183.875C 189.44,183.875 171.836,177.771 159.169,165.563C 146.502,153.354 140.169,136 140.169,113.5C 140.169,91.2708 146.232,73.625 158.377,60.5417C 170.502,47.4792 186.482,40.9375 206.294,40.9375C 224.627,40.9375 238.752,46.3125 248.711,57.0208C 258.648,67.7292 263.627,82.9583 263.627,102.667L 263.627,115.083 Z M 241.357,97.5625C 241.273,85.5625 238.232,76.2708 232.273,69.6875C 226.315,63.1042 217.232,59.8125 205.065,59.8125C 192.815,59.8125 183.044,63.4375 175.794,70.6458C 168.523,77.875 164.398,86.8542 163.44,97.5625L 241.357,97.5625 Z " />
     </GeometryGroup>
 
+    <!--  The NightFront app's own icon (Resources\NightFrontIcon.png), used for in-block branding  -->
+    <BitmapImage x:Key="NightFrontAppIconImage" UriSource="pack://application:,,,/JeffRidder.NINA.Nightfront;component/Resources/NightFrontIcon.png" />
+
     <!--  NightFront Container: holds the instructions imported from a NightFront plan file  -->
     <DataTemplate DataType="{x:Type local:NightFrontContainer}">
         <nina:SequenceBlockView>
             <nina:SequenceBlockView.SequenceItemContent>
-                <TextBlock VerticalAlignment="Center" Text="{Binding Items.Count, StringFormat='{}{0} imported instruction(s)'}" />
+                <StackPanel Orientation="Horizontal">
+                    <Image
+                        Width="20"
+                        Height="20"
+                        Margin="0,0,5,0"
+                        Source="{StaticResource NightFrontAppIconImage}" />
+                    <TextBlock VerticalAlignment="Center" Text="{Binding Items.Count, StringFormat='{}{0} imported instruction(s)'}" />
+                </StackPanel>
             </nina:SequenceBlockView.SequenceItemContent>
         </nina:SequenceBlockView>
     </DataTemplate>
@@ -23,7 +33,14 @@
     <DataTemplate x:Key="JeffRidder.NINA.Nightfront.Sequencer.NightFrontContainer_Mini">
         <mini:MiniSequenceItem>
             <mini:MiniSequenceItem.SequenceItemContent>
-                <TextBlock VerticalAlignment="Center" Text="NightFront" />
+                <StackPanel Orientation="Horizontal">
+                    <Image
+                        Width="16"
+                        Height="16"
+                        Margin="0,0,5,0"
+                        Source="{StaticResource NightFrontAppIconImage}" />
+                    <TextBlock VerticalAlignment="Center" Text="NightFront" />
+                </StackPanel>
             </mini:MiniSequenceItem.SequenceItemContent>
         </mini:MiniSequenceItem>
     </DataTemplate>
@@ -32,11 +49,18 @@
     <DataTemplate DataType="{x:Type local:NightFrontUpdateInstruction}">
         <nina:SequenceBlockView>
             <nina:SequenceBlockView.SequenceItemContent>
-                <TextBlock
-                    MaxWidth="220"
-                    VerticalAlignment="Center"
-                    Text="Checks for today's NightFront plan and populates the enclosing container"
-                    TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal">
+                    <Image
+                        Width="20"
+                        Height="20"
+                        Margin="0,0,5,0"
+                        Source="{StaticResource NightFrontAppIconImage}" />
+                    <TextBlock
+                        MaxWidth="220"
+                        VerticalAlignment="Center"
+                        Text="Checks for today's NightFront plan and populates the enclosing container"
+                        TextWrapping="Wrap" />
+                </StackPanel>
             </nina:SequenceBlockView.SequenceItemContent>
         </nina:SequenceBlockView>
     </DataTemplate>
@@ -44,7 +68,14 @@
     <DataTemplate x:Key="JeffRidder.NINA.Nightfront.Sequencer.NightFrontUpdateInstruction_Mini">
         <mini:MiniSequenceItem>
             <mini:MiniSequenceItem.SequenceItemContent>
-                <TextBlock VerticalAlignment="Center" Text="Update" />
+                <StackPanel Orientation="Horizontal">
+                    <Image
+                        Width="16"
+                        Height="16"
+                        Margin="0,0,5,0"
+                        Source="{StaticResource NightFrontAppIconImage}" />
+                    <TextBlock VerticalAlignment="Center" Text="Update" />
+                </StackPanel>
             </mini:MiniSequenceItem.SequenceItemContent>
         </mini:MiniSequenceItem>
     </DataTemplate>
