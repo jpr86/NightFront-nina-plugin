@@ -7,8 +7,8 @@ using System.Runtime.InteropServices;
 
 // [MANDATORY] The assembly versioning
 //Should be incremented for each new release build of a plugin
-[assembly: AssemblyVersion("1.0.0.2")]
-[assembly: AssemblyFileVersion("1.0.0.2")]
+[assembly: AssemblyVersion("1.0.0.3")]
+[assembly: AssemblyFileVersion("1.0.0.3")]
 
 // [MANDATORY] The name of your plugin
 [assembly: AssemblyTitle("NightFront")]
@@ -31,22 +31,21 @@ using System.Runtime.InteropServices;
 // The url to the license
 [assembly: AssemblyMetadata("LicenseURL", "https://www.mozilla.org/en-US/MPL/2.0/")]
 // The repository where your pluggin is hosted
-// TODO: confirm/update once this project has a real GitHub remote configured.
-[assembly: AssemblyMetadata("Repository", "https://github.com/jpr86/nightfront-nina-plugin")]
+[assembly: AssemblyMetadata("Repository", "https://github.com/jpr86/NightFront-nina-plugin")]
 
 // The following attributes are optional for the official manifest meta data
 
 //[Optional] Your plugin homepage URL - omit if not applicaple
-[assembly: AssemblyMetadata("Homepage", "https://github.com/jpr86/nightfront-nina-plugin")]
+[assembly: AssemblyMetadata("Homepage", "https://github.com/jpr86/NightFront-nina-plugin")]
 
 //[Optional] Common tags that quickly describe your plugin
 [assembly: AssemblyMetadata("Tags", "NightFront,Sequencer,Automation,Scheduling")]
 
 //[Optional] A link that will show a log of all changes in between your plugin's versions
-[assembly: AssemblyMetadata("ChangelogURL", "https://github.com/jpr86/nightfront-nina-plugin/blob/main/CHANGELOG.md")]
+[assembly: AssemblyMetadata("ChangelogURL", "https://github.com/jpr86/NightFront-nina-plugin/blob/master/CHANGELOG.md")]
 
 //[Optional] The url to a featured logo that will be displayed in the plugin list next to the name
-[assembly: AssemblyMetadata("FeaturedImageURL", "")]
+[assembly: AssemblyMetadata("FeaturedImageURL", "https://raw.githubusercontent.com/jpr86/NightFront-nina-plugin/master/Resources/NightFrontIcon.png")]
 //[Optional] A url to an example screenshot of your plugin in action
 [assembly: AssemblyMetadata("ScreenshotURL", "")]
 //[Optional] An additional url to an example example screenshot of your plugin in action

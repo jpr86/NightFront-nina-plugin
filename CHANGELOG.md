@@ -1,5 +1,11 @@
 ﻿# NightFront
 
+## 1.0.0.3
+- Removed the vestigial "Default Notification Message" and "Profile Specific Notification Message" options left over from the plugin template.
+- Removed the remaining misplaced color icon from the NightFront Container block; the sequencer's own chrome already shows the icon and name.
+- Set the plugin list's featured icon to the NightFront app icon.
+- The `<plan>.metadata.json` calibration file now records each target's *measured* rotator position (read from the rotator right after that target's slew/center/rotate finishes) instead of the plan's input Sky PA, and dedupes filter/rotation-angle pairs within 1 degree of each other.
+
 ## 1.0.0.2
 - Renamed "NightFront Update" to "Nightly Update" and changed it to run as a sibling immediately before the NightFront Container it populates, instead of as a child inside it. Existing sequences will need the instruction moved out of the container.
 - Nightly Update now shows a live status indicator (success/failure and message) in the sequencer.

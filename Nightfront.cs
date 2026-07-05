@@ -5,7 +5,6 @@ using NINA.Core.Utility;
 using NINA.Image.ImageData;
 using NINA.Plugin;
 using NINA.Plugin.Interfaces;
-using NINA.Profile;
 using NINA.Profile.Interfaces;
 using NINA.WPF.Base.Interfaces.Mediator;
 using NINA.WPF.Base.Interfaces.ViewModel;
@@ -31,7 +30,6 @@ namespace JeffRidder.NINA.Nightfront {
     /// </summary>
     [Export(typeof(IPluginManifest))]
     public class Nightfront : PluginBase, INotifyPropertyChanged {
-        private readonly IPluginOptionsAccessor pluginSettings;
         private readonly IProfileService profileService;
         private readonly IImageSaveMediator imageSaveMediator;
 
@@ -46,11 +44,7 @@ namespace JeffRidder.NINA.Nightfront {
                 CoreUtil.SaveSettings(Settings.Default);
             }
 
-            // This helper class can be used to store plugin settings that are dependent on the current profile
-            this.pluginSettings = new PluginOptionsAccessor(profileService, Guid.Parse(this.Identifier));
             this.profileService = profileService;
-            // React on a changed profile
-            profileService.ProfileChanged += ProfileService_ProfileChanged;
 
             // Hook into image saving for adding FITS keywords or image file patterns
             this.imageSaveMediator = imageSaveMediator;
@@ -65,16 +59,10 @@ namespace JeffRidder.NINA.Nightfront {
 
         public override Task Teardown() {
             // Make sure to unregister an event when the object is no longer in use. Otherwise garbage collection will be prevented.
-            profileService.ProfileChanged -= ProfileService_ProfileChanged;
             imageSaveMediator.BeforeImageSaved -= ImageSaveMediator_BeforeImageSaved;
             imageSaveMediator.BeforeFinalizeImageSaved -= ImageSaveMediator_BeforeFinalizeImageSaved;
 
             return base.Teardown();
-        }
-
-        private void ProfileService_ProfileChanged(object sender, EventArgs e) {
-            // Rase the event that this profile specific value has been changed due to the profile switch
-            RaisePropertyChanged(nameof(ProfileSpecificNotificationMessage));
         }
 
         private Task ImageSaveMediator_BeforeImageSaved(object sender, BeforeImageSavedEventArgs e) {
@@ -112,27 +100,6 @@ namespace JeffRidder.NINA.Nightfront {
             });
 
             return Task.CompletedTask;
-        }
-
-        public string DefaultNotificationMessage {
-            get {
-                return Settings.Default.DefaultNotificationMessage;
-            }
-            set {
-                Settings.Default.DefaultNotificationMessage = value;
-                CoreUtil.SaveSettings(Settings.Default);
-                RaisePropertyChanged();
-            }
-        }
-
-        public string ProfileSpecificNotificationMessage {
-            get {
-                return pluginSettings.GetValueString(nameof(ProfileSpecificNotificationMessage), string.Empty);
-            }
-            set {
-                pluginSettings.SetValueString(nameof(ProfileSpecificNotificationMessage), value);
-                RaisePropertyChanged();
-            }
         }
 
         // The folder NightFront Update checks for today's plan file. Global (not per-profile), since

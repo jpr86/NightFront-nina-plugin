@@ -90,19 +90,14 @@
         GenericRowTemplate="{StaticResource NightFrontGenericSummaryRow}"
         TargetRowTemplate="{StaticResource NightFrontTargetSummaryRow}" />
 
-    <!--  NightFront Container: holds the instructions imported from a NightFront plan file  -->
+    <!--  NightFront Container: holds the instructions imported from a NightFront plan file. The icon
+          and name are already shown by the sequencer's own chrome to the left of this content, so
+          no icon is repeated here. -->
     <DataTemplate DataType="{x:Type local:NightFrontContainer}">
         <nina:SequenceBlockView>
             <nina:SequenceBlockView.SequenceItemContent>
                 <StackPanel Orientation="Vertical">
-                    <StackPanel Orientation="Horizontal">
-                        <Image
-                            Width="20"
-                            Height="20"
-                            Margin="0,0,5,0"
-                            Source="{StaticResource NightFrontAppIconImage}" />
-                        <TextBlock VerticalAlignment="Center" Text="{Binding Items.Count, StringFormat='{}{0} target(s) scheduled'}" />
-                    </StackPanel>
+                    <TextBlock Text="{Binding Items.Count, StringFormat='{}{0} target(s) scheduled'}" />
                     <ItemsControl
                         Margin="25,4,0,0"
                         ItemTemplateSelector="{StaticResource NightFrontTargetRowTemplateSelector}"

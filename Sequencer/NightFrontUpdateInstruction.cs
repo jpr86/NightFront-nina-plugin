@@ -42,6 +42,7 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
     public class NightFrontUpdateInstruction : SequenceItem, IValidatable {
         private readonly IProfileService profileService;
         private readonly NightFrontJsonImporter importer;
+        private readonly IRotatorMediator rotatorMediator;
 
         [ImportingConstructor]
         public NightFrontUpdateInstruction(
@@ -87,15 +88,17 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                     framingAssistantVM,
                     applicationMediator,
                     planetariumFactory,
-                    dateTimeProviders)) {
+                    dateTimeProviders),
+                rotatorMediator) {
         }
 
-        private NightFrontUpdateInstruction(IProfileService profileService, NightFrontJsonImporter importer) {
+        private NightFrontUpdateInstruction(IProfileService profileService, NightFrontJsonImporter importer, IRotatorMediator rotatorMediator) {
             this.profileService = profileService;
             this.importer = importer;
+            this.rotatorMediator = rotatorMediator;
         }
 
-        private NightFrontUpdateInstruction(NightFrontUpdateInstruction copyMe) : this(copyMe.profileService, copyMe.importer) {
+        private NightFrontUpdateInstruction(NightFrontUpdateInstruction copyMe) : this(copyMe.profileService, copyMe.importer, copyMe.rotatorMediator) {
             CopyMetaData(copyMe);
         }
 
@@ -204,7 +207,11 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                 StatusMessage = $"Plan retrieved from file: {Path.GetFileName(matchedFile)}";
                 LastRunTimestamp = DateTime.Now;
 
-                WriteMetadataFile(folder, matchedFile, imported);
+                // Watches the imported CenterAndRotate instructions as the night's imaging actually
+                // runs and writes the metadata file itself once each target's rotation is measured -
+                // see NightFrontMetadataRecorder for why this can't be done up front from the plan.
+                var metadataPath = Path.Combine(folder, Path.GetFileNameWithoutExtension(matchedFile) + ".metadata.json");
+                new NightFrontMetadataRecorder(imported, rotatorMediator, Path.GetFileName(matchedFile), metadataPath);
 
                 Notification.ShowSuccess($"NightFront: imported plan for {todayToken} ({imported.Count} target(s)).");
             } catch (OperationCanceledException) {
@@ -221,16 +228,6 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                 StatusMessage = $"Plan import failed: {ex.Message}";
                 LastRunTimestamp = DateTime.Now;
                 throw;
-            }
-        }
-
-        private static void WriteMetadataFile(string folder, string matchedFile, IList<ISequenceItem> imported) {
-            try {
-                var metadata = NightFrontPlanMetadataExtractor.Extract(imported, Path.GetFileName(matchedFile));
-                var metadataPath = Path.Combine(folder, Path.GetFileNameWithoutExtension(matchedFile) + ".metadata.json");
-                File.WriteAllText(metadataPath, JsonConvert.SerializeObject(metadata, Formatting.Indented));
-            } catch (Exception ex) {
-                Notification.ShowWarning($"NightFront: failed to write calibration metadata file: {ex.Message}");
             }
         }
 
