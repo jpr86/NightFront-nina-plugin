@@ -1,0 +1,48 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this is
+
+NightFront is a plugin for [N.I.N.A.](https://nighttime-imaging.eu/) (Nighttime Imaging 'N' Astronomy). A companion desktop app ("NightFront") uses forecast data and optimization to generate nightly imaging plans; this plugin ingests those plans and drives their execution inside a NINA Advanced Sequencer sequence. Target framework: `net8.0-windows` (WPF, `AssemblyName` = `JeffRidder.NINA.Nightfront`).
+
+The plugin was scaffolded from the [nina.plugin.template](https://github.com/isbeorn/nina.plugin.template), so several files are unmodified template boilerplate rather than real NightFront features — see "Template boilerplate vs. real features" below before assuming a class is load-bearing.
+
+## Build, test, run
+
+- Build: `dotnet build NightFront.slnx` (or open in Visual Studio; solution is a `.slnx`, not `.sln`).
+- Test: `dotnet test NightFront.Tests/NightFront.Tests.csproj` (xUnit + Moq). Run a single test with `dotnet test --filter "FullyQualifiedName~NightFrontJsonImporterTests.MethodName"`.
+- Note: some importer tests that build a real `InputTarget`/`InputCoordinates` graph transitively call into NINA.Astrometry's native `NOVAS31lib.dll`. That DLL isn't in the NuGet package — it only ships with a real NINA install — so those specific tests only pass on a machine where it's been copied into the test project's output folder. The rest of the importer tests avoid astrometry code and run anywhere.
+- Post-build step: `NightFront.csproj` has a `PostBuild` target that xcopies the build output into `%localappdata%\NINA\Plugins\3.0.0\<TargetName>` so a local NINA install picks up the plugin immediately — this only works on Windows with NINA installed.
+- `CopyLocalLockFileAssemblies` is `true` deliberately: NINA loads this plugin standalone (not via a referencing project), so any NuGet package it references directly (e.g. Ookii.Dialogs.Wpf) must be copied alongside the built DLL. Conversely, `NINA.Plugin`'s own package reference uses `ExcludeAssets="runtime;native"` — NINA's own assemblies must come from the host process at runtime, not a private copy, or types like `ISequenceItem` fail to cast across the plugin/host boundary.
+
+## Architecture
+
+**Data flow:** the external NightFront app writes a nightly plan as a JSON file (a hand-rolled mimic of NINA's own sequence-serialization shape) into a configured folder. Inside NINA, the user builds a sequence containing a "Nightly Update" instruction (`NightFrontUpdateInstruction`) immediately followed by a "NightFront Container" (`NightFrontContainer`) as its next sibling — the update instruction runs once, finds the container that follows it, and populates it. At runtime:
+
+1. `NightFrontUpdateInstruction.Execute` (`Sequencer/NightFrontUpdateInstruction.cs`) looks in `Settings.Default.NightFrontDataFolder` for a `*.json` file whose name contains today's date (`yyyy-MM-dd`), and updates its own `LastRunSucceeded`/`StatusMessage`/`LastRunTimestamp` properties (bound in the sequencer UI as a status dot + message) regardless of outcome.
+2. It hands the file contents to `NightFrontJsonImporter.Import` (`Import/NightFrontJsonImporter.cs`), which walks the JSON tree and constructs real, live `NINA.Sequencer` objects (`DeepSkyObjectContainer`, `SequentialContainer`, `SwitchFilter`, `TakeExposure`, `Dither`, `RunAutofocus`, `StartGuiding`, `CenterAndRotate`, `TimeCondition`, `LoopCondition`) — this is the closed set of instruction types NightFront emits. Unrecognized `$type` values throw `NightFrontImportException`. The importer does not guarantee `DeepSkyObjectContainer` at the top level specifically — `BuildItem` accepts any of the supported types there, by convention rather than an enforced constraint.
+3. `NightFrontUpdateInstruction.Execute` locates the target container via `NightFrontContainer.FindNext(Parent.Items, this)` (a forward scan of its own parent's sibling list) and calls `NightFrontContainer.PopulateItems` to replace the container's children with the imported items, which then execute like any normal part of the sequence natively — the plugin does not interpret or manage execution itself (no custom pause/resume engine).
+4. On success, it also extracts calibration-relevant metadata (`Import/NightFrontPlanMetadataExtractor.cs`, walking the imported tree for `SwitchFilter`/`CenterAndRotate`/target `PositionAngle` values, grouped per target) and writes it to `<planfilename>.metadata.json` next to the plan file — best-effort, a write failure doesn't fail the import.
+
+Why a hand-rolled importer instead of NINA's native JSON sequence deserializer: `SequenceJsonConverter`/`TemplateController` are internal to NINA's composition root and unavailable to plugins. The [tcpalmer/nina.plugin.targetscheduler](https://github.com/tcpalmer/nina.plugin.targetscheduler) plugin takes the same approach for its own externally-sourced plan data and is a useful reference point.
+
+**Validation constraint:** `NightFrontUpdateInstruction.Validate()` enforces that a `NightFrontContainer` follows it as a sibling in the same parent (via `NightFrontContainer.FindNext`, not a parent/child relationship) and that the data folder setting is configured — both are structural requirements the sequencer UI can't otherwise guarantee. The class name `NightFrontUpdateInstruction` is intentionally unchanged from its "NightFront Update" display name (now "Nightly Update") to avoid breaking `$type`-based deserialization of previously-saved sequences.
+
+**Container summary view:** `NightFrontContainer.PopulateItems` also rebuilds `TargetSummaries`, an `ObservableCollection<object>` of `NightFrontTargetSummary` (one per top-level `DeepSkyObjectContainer`) or the raw `ISequenceItem` for any other top-level type, rendered via `NightFrontTargetRowTemplateSelector` in the sequencer UI. Each `NightFrontTargetSummary` (`Sequencer/NightFrontTargetSummary.cs`) is a live view of one target: name/coordinates/rotation/window-end are snapshotted once from the imported plan, `WindowStart` is chained from the previous target's `WindowEnd` (a target's own subtree only carries its end-of-window `TimeCondition`, not a start), and `CompletedCount`/`Status` stay live by subscribing to the underlying `LoopCondition`/`TakeExposure`/container `PropertyChanged` events as NINA executes.
+
+**Settings:** two kinds of plugin settings coexist:
+- `Settings.Default.*` (`Properties/Settings.Settings`, generated `Settings.Designer.cs`) — global, not per-equipment-profile. `NightFrontDataFolder` lives here because a NightFront installation exports to one location regardless of which NINA equipment profile is active.
+- `IPluginOptionsAccessor` (`pluginSettings` in `Nightfront.cs`) — per-profile settings, keyed by the plugin's GUID.
+
+**MEF composition:** NINA discovers plugin pieces via `System.ComponentModel.Composition` exports, not DI registration you'll find by searching for a container. Look for `[Export(typeof(...))]` / `[ImportingConstructor]` to find entry points: `Nightfront` (`IPluginManifest`, in `Nightfront.cs`) is the plugin root and options-tab data context; `NightFrontContainer` and `NightFrontUpdateInstruction` export `ISequenceItem` and carry `[ExportMetadata(...)]` for their sequencer-palette name/icon/category.
+
+## Template boilerplate vs. real features
+
+`NightfrontDockables/` (an altitude-chart imaging-tab panel) and `NightfrontDrivers/` (a fake random-data weather device/provider) are unmodified sample code from the plugin template — they demonstrate MEF export patterns (`IDockableVM`, `IEquipmentProvider<IWeatherData>`) but are not part of NightFront's actual plan-import feature. Don't assume they need to stay in sync with changes to the import/sequencer code, and confirm with the user before extending vs. removing them.
+
+The example FITS-keyword injection and example image pattern in `Nightfront.cs` (`exampleImagePattern`, the `ImageSaveMediator_*` handlers) are similarly template samples, not shipped behavior.
+
+## Known open work
+
+The four items in `todos/todos.txt` (sibling placement + status, the palette icon, a richer container summary, and collecting filters/rotation angles for calibration frames) have been implemented — see `CHANGELOG.md` under 1.0.0.2. The one question `todos/todos.txt` left explicitly open, whether the plugin should manage execution itself (pause/resume on unsafe conditions, like `tcpalmer/nina.plugin.targetscheduler`) instead of letting NINA execute the imported plan natively, was decided in favor of native execution for now — revisit `todos/todos.txt` item 3(b) if that needs to change. A consuming instruction for the `*.metadata.json` calibration-frame data doesn't exist yet.

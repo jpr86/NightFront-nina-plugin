@@ -1,0 +1,18 @@
+TODOs
+
+For reference, the template on which this project is based came from here: https://github.com/isbeorn/nina.plugin.template. A similar project to this one is here: https://github.com/tcpalmer/nina.plugin.targetscheduler
+
+1) The initial NightFront plugin does not work correctly. First, we need to change the NightFrontUpdateInstruction to be required to reside outside of the container. The reason for this is that it must be called before the night's imaging sequence beings,
+and content of the NightFrontContainer is the sequence to be executed. Thus, NightFrontUpdateInstruction is called to retrieve the night's plan, and then the container contains the plan to be executed that night by NINA. Also, let's change the name of the Update Instruction 
+"Nightly Update". See Image-2.png for a similar instruction from a different plugin. I'd like to see the status of the update in the field to the right of the instruction. Thus, if it fired correctly and found a plan, it says something like "Plan retrieved from
+file: [insert name of file]" and show a green light. If it failed to retrieve a plan it says something like "Plan not found" and a red light.
+
+2) The icon didn't get assigned to the Instructions correctly. See Image-1.png. There is a "Te" where I'd expect to see the Nightfront icon. Perhaps it needs to be rendered in black and white.
+
+3) The Container instruction doesn't show anything useful. It should be similar to Image-3.png, which shows a summary of the planned targets, an ephemeris graph, and then the series of instructions below. I don't think we need an ephemeris graph, but consider 
+a) whether we need a container or other instruction set
+b) whether we should implement the plan as is and let NINA execute it, or should we interpret the plan and then manage execution within the plugin. If the latter, then look at the Target Scheduler plugin for an example of how this is done, as it will need mechanisms to
+pause when conditions are unsafe, and then return to the same instruction when conditions are safe.
+
+4) I'd like the "container" or whatever we call the execution engine (suggest names) to collect meta-data that could be used on another instruction later. Specifically, collect the rotation angles and filters used throughout the night so that I can use this information to
+collect calibration frames later.
