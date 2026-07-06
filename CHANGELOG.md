@@ -1,5 +1,8 @@
 ﻿# NightFront
 
+## 1.0.0.6
+- Removed the altitude-chart imaging-tab panel left over from the plugin template. It was unrelated to NightFront's plan-import feature.
+
 ## 1.0.0.5
 - Fixed NightFront Container turning into an "Unknown Instruction" placeholder after saving and reopening a sequence. It was only MEF-exported as an `ISequenceItem`, so NINA's own sequence-container deserializer (which resolves containers from a separate `ISequenceContainer` export list, e.g. `DeepSkyObjectContainer`) could never find it. Now exported as both.
 
