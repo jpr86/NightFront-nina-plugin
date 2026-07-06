@@ -37,7 +37,7 @@ Why a hand-rolled importer instead of NINA's native JSON sequence deserializer: 
 
 ## Template boilerplate vs. real features
 
-`NightfrontDockables/` (an altitude-chart imaging-tab panel) and `NightfrontDrivers/` (a fake random-data weather device/provider) are unmodified sample code from the plugin template — they demonstrate MEF export patterns (`IDockableVM`, `IEquipmentProvider<IWeatherData>`) but are not part of NightFront's actual plan-import feature. Don't assume they need to stay in sync with changes to the import/sequencer code, and confirm with the user before extending vs. removing them.
+`NightfrontDrivers/` (a fake random-data weather device/provider) is unmodified sample code from the plugin template — it demonstrates the MEF export pattern (`IEquipmentProvider<IWeatherData>`) but is not part of NightFront's actual plan-import feature. Don't assume it needs to stay in sync with changes to the import/sequencer code, and confirm with the user before extending vs. removing it. (The template's `NightfrontDockables/` altitude-chart panel was removed as unused boilerplate.)
 
 The example FITS-keyword injection and example image pattern in `Nightfront.cs` (`exampleImagePattern`, the `ImageSaveMediator_*` handlers) are similarly template samples, not shipped behavior.
 
