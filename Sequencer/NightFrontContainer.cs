@@ -15,12 +15,13 @@ using System.Windows;
 namespace JeffRidder.NINA.Nightfront.Sequencer {
 
     /// <summary>
-    /// Holds the instructions imported from a NightFront plan file. Populated at runtime by a
-    /// preceding Nightly Update instruction placed immediately before this container in the same
-    /// parent; behaves as a normal SequentialContainer once populated.
+    /// Holds the instructions imported from a NightFront plan file. Populated at runtime by an
+    /// earlier Nightly Update instruction in the same sequence branch - either a preceding sibling
+    /// of this container, or nested inside one of that sibling's descendant containers (e.g. a
+    /// nightly imaging loop); behaves as a normal SequentialContainer once populated.
     /// </summary>
     [ExportMetadata("Name", "NightFront Container")]
-    [ExportMetadata("Description", "Holds the imaging instructions imported from a NightFront plan for the night. Place a Nightly Update instruction immediately before this container (as its preceding sibling) to populate it.")]
+    [ExportMetadata("Description", "Holds the imaging instructions imported from a NightFront plan for the night. Place a Nightly Update instruction earlier in the sequence (as a preceding sibling of this container, or an ancestor of one) to populate it.")]
     [ExportMetadata("Icon", "NightFront_SVG")]
     [ExportMetadata("Category", "NightFront")]
     [Export(typeof(ISequenceItem))]
@@ -116,9 +117,13 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
         }
 
         /// <summary>
-        /// Finds the first NightFrontContainer in <paramref name="siblings"/> that comes after
-        /// <paramref name="after"/>. Used by NightFrontUpdateInstruction to locate the container it
-        /// should populate, now that it runs as a preceding sibling rather than a child.
+        /// Finds the first NightFrontContainer reachable by scanning forward through
+        /// <paramref name="siblings"/> after <paramref name="after"/>, descending into each
+        /// following sibling's own subtree (depth-first, in execution order) if it doesn't match
+        /// directly. Used by NightFrontUpdateInstruction to locate the container it should
+        /// populate - it need not be an immediate sibling; it may be nested inside a later
+        /// sibling's descendant containers (e.g. a nightly imaging loop). Guards against a cyclic
+        /// container graph (e.g. from a corrupted saved sequence) revisiting the same container.
         /// </summary>
         public static NightFrontContainer FindNext(IList<ISequenceItem> siblings, ISequenceItem after) {
             if (siblings == null) {
@@ -130,12 +135,29 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                 return null;
             }
 
+            var visited = new HashSet<ISequenceContainer>(ReferenceEqualityComparer.Instance);
             for (int i = idx + 1; i < siblings.Count; i++) {
-                if (siblings[i] is NightFrontContainer container) {
-                    return container;
+                var found = FindInSubtree(siblings[i], visited);
+                if (found != null) {
+                    return found;
                 }
             }
 
+            return null;
+        }
+
+        private static NightFrontContainer FindInSubtree(ISequenceItem item, HashSet<ISequenceContainer> visited) {
+            if (item is NightFrontContainer container) {
+                return container;
+            }
+            if (item is ISequenceContainer parentContainer && visited.Add(parentContainer)) {
+                foreach (var child in parentContainer.Items) {
+                    var found = FindInSubtree(child, visited);
+                    if (found != null) {
+                        return found;
+                    }
+                }
+            }
             return null;
         }
 

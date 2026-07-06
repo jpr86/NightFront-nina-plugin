@@ -84,6 +84,9 @@ TestResult.xml
 # except build/, which is used as an MSBuild target.
 !**/[Pp]ackages/build/
 
+# Maintainer's scratch/todo notes - not part of the shipped plugin
+todos/
+
 # Others
 ClientBin/
 ~$*

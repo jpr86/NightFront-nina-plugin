@@ -28,13 +28,14 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
 
     /// <summary>
     /// Checks the configured NightFront data folder for a plan file matching today's date and, if
-    /// found, imports it into the NightFront Container that immediately follows it. Runs once per
-    /// execution - the expected usage is to place this once, immediately before a NightFront
-    /// Container (as its preceding sibling), to run right before the night's imaging sequence
-    /// begins.
+    /// found, imports it into the NightFront Container found by scanning forward through this
+    /// instruction's later siblings (and their descendants). Runs once per execution - the
+    /// expected usage is to place this once, near the top of a container that runs once at the
+    /// start of the night, before the NightFront Container it populates - which itself may be
+    /// nested deeper inside a later sibling, e.g. a container that loops until dawn.
     /// </summary>
     [ExportMetadata("Name", "Nightly Update")]
-    [ExportMetadata("Description", "Checks the configured NightFront folder for today's plan file and, if found, populates the following NightFront Container with it.")]
+    [ExportMetadata("Description", "Checks the configured NightFront folder for today's plan file and, if found, populates the NightFront Container found later in the same sequence branch (which may be nested inside a later sibling, e.g. a nightly imaging loop) with it.")]
     [ExportMetadata("Icon", "NightFront_SVG")]
     [ExportMetadata("Category", "NightFront")]
     [Export(typeof(ISequenceItem))]
@@ -160,7 +161,7 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
             }
 
             if (Parent == null || NightFrontContainer.FindNext(Parent.Items, this) == null) {
-                issues.Add("Nightly Update must be immediately followed, as a sibling in the same container, by a NightFront Container.");
+                issues.Add("Nightly Update must be followed later in the same sequence branch by a NightFront Container (as a sibling, or nested inside a later sibling).");
             }
 
             Issues = issues;

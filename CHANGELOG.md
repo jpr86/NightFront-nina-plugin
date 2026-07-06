@@ -1,5 +1,8 @@
 ﻿# NightFront
 
+## 1.0.0.4
+- Nightly Update no longer requires the NightFront Container to be its immediate sibling. It now scans forward through its later siblings and their descendant containers, so the Container can be nested several levels deep - e.g. inside a container that loops repeatedly until dawn, while Update itself runs once near the top of the night's sequence.
+
 ## 1.0.0.3
 - Removed the vestigial "Default Notification Message" and "Profile Specific Notification Message" options left over from the plugin template.
 - Removed the remaining misplaced color icon from the NightFront Container block; the sequencer's own chrome already shows the icon and name.
