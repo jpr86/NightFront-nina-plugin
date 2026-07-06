@@ -1,5 +1,10 @@
 ﻿# NightFront
 
+## 1.0.0.8
+- Removed the example FITS-keyword/image-pattern demo left over from the plugin template. It was injecting placeholder `STRKEYWD`/`INTKEYWD`/`DBLKEYWD` header values and a `$$EXAMPLEPATTERN$$` file pattern option into every saved image; none of it was NightFront behavior.
+- Removed dead Entity Framework/SQLite configuration from `app.config` carried over from the template; NightFront has no such dependency.
+- Fixed a stale `MyPlugin.Properties` namespace left in `Properties/Settings.Settings` (the generated `Settings.Designer.cs` was already `JeffRidder.NINA.Nightfront.Properties`) and cleaned up leftover template comments.
+
 ## 1.0.0.7
 - Removed the fake random-data weather device/provider left over from the plugin template. It was unrelated to NightFront's plan-import feature.
 

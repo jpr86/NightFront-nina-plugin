@@ -37,9 +37,7 @@ Why a hand-rolled importer instead of NINA's native JSON sequence deserializer: 
 
 ## Template boilerplate vs. real features
 
-The plugin template's sample code (`NightfrontDockables/`'s altitude-chart panel, `NightfrontDrivers/`'s fake random-data weather device/provider) has been removed as unused boilerplate — none of it was part of NightFront's actual plan-import feature.
-
-The example FITS-keyword injection and example image pattern in `Nightfront.cs` (`exampleImagePattern`, the `ImageSaveMediator_*` handlers) are similarly template samples, not shipped behavior.
+The plugin template's sample code has been removed as unused boilerplate, since none of it was part of NightFront's actual plan-import feature: `NightfrontDockables/`'s altitude-chart panel, `NightfrontDrivers/`'s fake random-data weather device/provider, and `Nightfront.cs`'s example FITS-keyword injection and example image pattern (`exampleImagePattern`, the `ImageSaveMediator_*` handlers).
 
 ## Known open work
 
