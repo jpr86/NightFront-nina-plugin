@@ -25,6 +25,7 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
     [ExportMetadata("Icon", "NightFront_SVG")]
     [ExportMetadata("Category", "NightFront")]
     [Export(typeof(ISequenceItem))]
+    [Export(typeof(ISequenceContainer))]
     [JsonObject(MemberSerialization.OptIn)]
     public class NightFrontContainer : SequentialContainer {
 

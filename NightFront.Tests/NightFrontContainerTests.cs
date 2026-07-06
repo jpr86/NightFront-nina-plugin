@@ -3,11 +3,31 @@ using Moq;
 using NINA.Sequencer.Container;
 using NINA.Sequencer.SequenceItem;
 using System.Collections.Generic;
+using System.ComponentModel.Composition;
+using System.Linq;
 using Xunit;
 
 namespace JeffRidder.NINA.Nightfront.Tests {
 
     public class NightFrontContainerTests {
+
+        [Fact]
+        public void NightFrontContainer_IsExportedAsBothSequenceItemAndSequenceContainer() {
+            // NINA deserializes a saved sequence's containers via a completely separate MEF export
+            // list than plain items (see NINA.Sequencer.SequencerFactory.GetContainer<T>(), which only
+            // looks at ISequenceContainer exports). Missing the ISequenceContainer export here means
+            // NightFrontContainer round-trips as an "Unknown Instruction" placeholder after save/reload,
+            // even though it still works fine when dragged in fresh from the palette (which only needs
+            // the ISequenceItem export).
+            var exportedContracts = typeof(NightFrontContainer)
+                .GetCustomAttributes(typeof(ExportAttribute), inherit: false)
+                .Cast<ExportAttribute>()
+                .Select(a => a.ContractType)
+                .ToList();
+
+            Assert.Contains(typeof(ISequenceItem), exportedContracts);
+            Assert.Contains(typeof(ISequenceContainer), exportedContracts);
+        }
 
         [Fact]
         public void FindNext_ContainerImmediatelyAfter_ReturnsIt() {

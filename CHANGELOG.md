@@ -1,5 +1,8 @@
 ﻿# NightFront
 
+## 1.0.0.5
+- Fixed NightFront Container turning into an "Unknown Instruction" placeholder after saving and reopening a sequence. It was only MEF-exported as an `ISequenceItem`, so NINA's own sequence-container deserializer (which resolves containers from a separate `ISequenceContainer` export list, e.g. `DeepSkyObjectContainer`) could never find it. Now exported as both.
+
 ## 1.0.0.4
 - Nightly Update no longer requires the NightFront Container to be its immediate sibling. It now scans forward through its later siblings and their descendant containers, so the Container can be nested several levels deep - e.g. inside a container that loops repeatedly until dawn, while Update itself runs once near the top of the night's sequence.
 
