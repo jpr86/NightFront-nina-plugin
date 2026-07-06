@@ -1,5 +1,8 @@
 ﻿# NightFront
 
+## 1.0.0.7
+- Removed the fake random-data weather device/provider left over from the plugin template. It was unrelated to NightFront's plan-import feature.
+
 ## 1.0.0.6
 - Removed the altitude-chart imaging-tab panel left over from the plugin template. It was unrelated to NightFront's plan-import feature.
 
