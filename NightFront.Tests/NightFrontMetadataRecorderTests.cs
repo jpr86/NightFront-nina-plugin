@@ -33,7 +33,7 @@ namespace JeffRidder.NINA.Nightfront.Tests {
     // transitively calls into NOVAS31lib.dll - see NightFrontJsonImporterTests' class comment.
     public class NightFrontMetadataRecorderTests {
 
-        private static string BuildTargetJson(string name, double positionAngle, string filter) {
+        private static string BuildTargetJson(string name, double positionAngle, string filter, int gain = -1, int offset = -1) {
             return $@"{{
               ""$type"": ""NINA.Sequencer.Container.DeepSkyObjectContainer, NINA.Sequencer"",
               ""Name"": ""{name}"",
@@ -50,7 +50,36 @@ namespace JeffRidder.NINA.Nightfront.Tests {
               ""Items"": {{
                 ""$values"": [
                   {{ ""$type"": ""NINA.Sequencer.SequenceItem.Platesolving.CenterAndRotate, NINA.Sequencer"", ""PositionAngle"": {positionAngle} }},
-                  {{ ""$type"": ""NINA.Sequencer.SequenceItem.FilterWheel.SwitchFilter, NINA.Sequencer"", ""Filter"": {{ ""$type"": ""NINA.Core.Model.Equipment.FilterInfo, NINA.Core"", ""_name"": ""{filter}"" }} }}
+                  {{ ""$type"": ""NINA.Sequencer.SequenceItem.FilterWheel.SwitchFilter, NINA.Sequencer"", ""Filter"": {{ ""$type"": ""NINA.Core.Model.Equipment.FilterInfo, NINA.Core"", ""_name"": ""{filter}"" }} }},
+                  {{ ""$type"": ""NINA.Sequencer.SequenceItem.Imaging.TakeExposure, NINA.Sequencer"", ""Gain"": {gain}, ""Offset"": {offset} }}
+                ]
+              }}
+            }}";
+        }
+
+        // A target with two filter/exposure blocks (used by the gain/offset-attribution test), so a
+        // TakeExposure is always paired with the SwitchFilter that most recently preceded it.
+        private static string BuildTwoFilterBlocksTargetJson(string name, double positionAngle, string filter, int gain1, int offset1, int gain2, int offset2) {
+            return $@"{{
+              ""$type"": ""NINA.Sequencer.Container.DeepSkyObjectContainer, NINA.Sequencer"",
+              ""Name"": ""{name}"",
+              ""Target"": {{
+                ""$type"": ""NINA.Astrometry.InputTarget, NINA.Astrometry"",
+                ""TargetName"": ""{name}"",
+                ""PositionAngle"": {positionAngle},
+                ""InputCoordinates"": {{
+                  ""$type"": ""NINA.Astrometry.InputCoordinates, NINA.Astrometry"",
+                  ""RAHours"": 20, ""RAMinutes"": 59, ""RASeconds"": 17.1,
+                  ""NegativeDec"": false, ""DecDegrees"": 44, ""DecMinutes"": 31, ""DecSeconds"": 44.0
+                }}
+              }},
+              ""Items"": {{
+                ""$values"": [
+                  {{ ""$type"": ""NINA.Sequencer.SequenceItem.Platesolving.CenterAndRotate, NINA.Sequencer"", ""PositionAngle"": {positionAngle} }},
+                  {{ ""$type"": ""NINA.Sequencer.SequenceItem.FilterWheel.SwitchFilter, NINA.Sequencer"", ""Filter"": {{ ""$type"": ""NINA.Core.Model.Equipment.FilterInfo, NINA.Core"", ""_name"": ""{filter}"" }} }},
+                  {{ ""$type"": ""NINA.Sequencer.SequenceItem.Imaging.TakeExposure, NINA.Sequencer"", ""Gain"": {gain1}, ""Offset"": {offset1} }},
+                  {{ ""$type"": ""NINA.Sequencer.SequenceItem.FilterWheel.SwitchFilter, NINA.Sequencer"", ""Filter"": {{ ""$type"": ""NINA.Core.Model.Equipment.FilterInfo, NINA.Core"", ""_name"": ""{filter}"" }} }},
+                  {{ ""$type"": ""NINA.Sequencer.SequenceItem.Imaging.TakeExposure, NINA.Sequencer"", ""Gain"": {gain2}, ""Offset"": {offset2} }}
                 ]
               }}
             }}";
@@ -123,6 +152,18 @@ namespace JeffRidder.NINA.Nightfront.Tests {
             return null;
         }
 
+        private static (string LivePath, string ArchivedPath) CreateTempPaths() {
+            var id = Guid.NewGuid();
+            return (
+                Path.Combine(Path.GetTempPath(), id + ".metadata.json"),
+                Path.Combine(Path.GetTempPath(), id + ".archived.metadata.json"));
+        }
+
+        private static void DeletePaths((string LivePath, string ArchivedPath) paths) {
+            File.Delete(paths.LivePath);
+            File.Delete(paths.ArchivedPath);
+        }
+
         [Fact]
         public void Extract_DoesNotRecordAnythingUntilCenterAndRotateFinishes() {
             var profileService = CreateProfileServiceWithFilters("Ha");
@@ -132,13 +173,13 @@ namespace JeffRidder.NINA.Nightfront.Tests {
             var rotatorMediator = new Mock<IRotatorMediator>();
             rotatorMediator.Setup(r => r.GetInfo()).Returns(new RotatorInfo { MechanicalPosition = 99f });
 
-            var metadataPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".metadata.json");
+            var paths = CreateTempPaths();
             try {
-                new NightFrontMetadataRecorder(imported, rotatorMediator.Object, "plan.json", metadataPath);
+                new NightFrontMetadataRecorder(imported, rotatorMediator.Object, "plan.json", paths.LivePath, paths.ArchivedPath);
 
-                Assert.False(File.Exists(metadataPath));
+                Assert.False(File.Exists(paths.LivePath));
             } finally {
-                File.Delete(metadataPath);
+                DeletePaths(paths);
             }
         }
 
@@ -153,30 +194,31 @@ namespace JeffRidder.NINA.Nightfront.Tests {
             var rotatorMediator = new Mock<IRotatorMediator>();
             rotatorMediator.Setup(r => r.GetInfo()).Returns(new RotatorInfo { MechanicalPosition = 99f });
 
-            var metadataPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".metadata.json");
+            var paths = CreateTempPaths();
             try {
-                new NightFrontMetadataRecorder(imported, rotatorMediator.Object, "plan.json", metadataPath);
+                new NightFrontMetadataRecorder(imported, rotatorMediator.Object, "plan.json", paths.LivePath, paths.ArchivedPath);
                 var centerAndRotate = FindCenterAndRotate(imported);
                 Assert.NotNull(centerAndRotate);
                 centerAndRotate.Status = SequenceEntityStatus.FINISHED;
 
-                var json = File.ReadAllText(metadataPath);
-                var metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<NightFrontPlanMetadata>(json);
-                Assert.NotNull(metadata);
+                var metadata = NightFrontMetadataStore.Load(paths.LivePath);
 
                 var requirement = Assert.Single(metadata.CalibrationRequirements);
                 Assert.Equal("Ha", requirement.Filter);
                 Assert.Equal(99.0, requirement.RotationAngle, 3);
                 Assert.NotEqual(12.5, requirement.RotationAngle);
             } finally {
-                File.Delete(metadataPath);
+                DeletePaths(paths);
             }
         }
 
         [Fact]
-        public void Extract_DedupesSameFilterWithinOneDegree_AcrossTargets() {
+        public void Extract_DedupesSameFilterGainOffsetWithinOneDegree_AcrossTargets() {
             var profileService = CreateProfileServiceWithFilters("Ha");
             var importer = CreateImporter(profileService);
+            // Both targets use the default sentinel gain/offset (-1,-1) from BuildTargetJson, so this
+            // also exercises that two targets producing the identical (filter, angle, gain, offset)
+            // tuple in one run resolve to exactly one stored requirement rather than two.
             var imported = importer.Import(BuildPlanJson(
                 BuildTargetJson("NGC 7000", 12.5, "Ha"),
                 BuildTargetJson("M31", 45.0, "Ha")));
@@ -185,9 +227,9 @@ namespace JeffRidder.NINA.Nightfront.Tests {
             var rotatorMediator = new Mock<IRotatorMediator>();
             rotatorMediator.Setup(r => r.GetInfo()).Returns(() => new RotatorInfo { MechanicalPosition = angles.Dequeue() });
 
-            var metadataPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".metadata.json");
+            var paths = CreateTempPaths();
             try {
-                new NightFrontMetadataRecorder(imported, rotatorMediator.Object, "plan.json", metadataPath);
+                new NightFrontMetadataRecorder(imported, rotatorMediator.Object, "plan.json", paths.LivePath, paths.ArchivedPath);
 
                 var top = FindTopLevelDsoContainers(imported);
                 foreach (var dso in top) {
@@ -196,13 +238,10 @@ namespace JeffRidder.NINA.Nightfront.Tests {
                     centerAndRotate.Status = SequenceEntityStatus.FINISHED;
                 }
 
-                var json = File.ReadAllText(metadataPath);
-                var metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<NightFrontPlanMetadata>(json);
-                Assert.NotNull(metadata);
-
+                var metadata = NightFrontMetadataStore.Load(paths.LivePath);
                 Assert.Single(metadata.CalibrationRequirements);
             } finally {
-                File.Delete(metadataPath);
+                DeletePaths(paths);
             }
         }
 
@@ -218,9 +257,9 @@ namespace JeffRidder.NINA.Nightfront.Tests {
             var rotatorMediator = new Mock<IRotatorMediator>();
             rotatorMediator.Setup(r => r.GetInfo()).Returns(() => new RotatorInfo { MechanicalPosition = angles.Dequeue() });
 
-            var metadataPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".metadata.json");
+            var paths = CreateTempPaths();
             try {
-                new NightFrontMetadataRecorder(imported, rotatorMediator.Object, "plan.json", metadataPath);
+                new NightFrontMetadataRecorder(imported, rotatorMediator.Object, "plan.json", paths.LivePath, paths.ArchivedPath);
 
                 var top = FindTopLevelDsoContainers(imported);
                 foreach (var dso in top) {
@@ -229,13 +268,74 @@ namespace JeffRidder.NINA.Nightfront.Tests {
                     centerAndRotate.Status = SequenceEntityStatus.FINISHED;
                 }
 
-                var json = File.ReadAllText(metadataPath);
-                var metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<NightFrontPlanMetadata>(json);
-                Assert.NotNull(metadata);
-
+                var metadata = NightFrontMetadataStore.Load(paths.LivePath);
                 Assert.Equal(2, metadata.CalibrationRequirements.Count);
             } finally {
-                File.Delete(metadataPath);
+                DeletePaths(paths);
+            }
+        }
+
+        [Fact]
+        public void Extract_DoesNotDedupeSameFilterAngle_WhenGainOrOffsetDiffers() {
+            var profileService = CreateProfileServiceWithFilters("Ha");
+            var importer = CreateImporter(profileService);
+            // Same target, same rotation angle, same filter - but two exposure blocks with different
+            // gain/offset. Item 0's core new behavior: gain/offset join the dedup key, so this must
+            // produce two distinct calibration requirements, not one.
+            var imported = importer.Import(BuildPlanJson(
+                BuildTwoFilterBlocksTargetJson("NGC 7000", 12.5, "Ha", gain1: 100, offset1: 10, gain2: 200, offset2: 20)));
+
+            var rotatorMediator = new Mock<IRotatorMediator>();
+            rotatorMediator.Setup(r => r.GetInfo()).Returns(new RotatorInfo { MechanicalPosition = 30.0f });
+
+            var paths = CreateTempPaths();
+            try {
+                new NightFrontMetadataRecorder(imported, rotatorMediator.Object, "plan.json", paths.LivePath, paths.ArchivedPath);
+                var centerAndRotate = FindCenterAndRotate(imported);
+                Assert.NotNull(centerAndRotate);
+                centerAndRotate.Status = SequenceEntityStatus.FINISHED;
+
+                var metadata = NightFrontMetadataStore.Load(paths.LivePath);
+                Assert.Equal(2, metadata.CalibrationRequirements.Count);
+                Assert.Contains(metadata.CalibrationRequirements, r => r.Gain == 100 && r.Offset == 10);
+                Assert.Contains(metadata.CalibrationRequirements, r => r.Gain == 200 && r.Offset == 20);
+            } finally {
+                DeletePaths(paths);
+            }
+        }
+
+        [Fact]
+        public void Extract_AccumulatesAcrossConstructions_DoesNotOverwritePriorEntries() {
+            var profileService = CreateProfileServiceWithFilters("Ha", "OIII");
+            var importer = CreateImporter(profileService);
+            var paths = CreateTempPaths();
+
+            try {
+                // Simulates a prior night: a first recorder records one requirement and is discarded.
+                var firstNight = importer.Import(BuildPlanJson(BuildTargetJson("NGC 7000", 12.5, "Ha")));
+                var firstRotator = new Mock<IRotatorMediator>();
+                firstRotator.Setup(r => r.GetInfo()).Returns(new RotatorInfo { MechanicalPosition = 30.0f });
+                new NightFrontMetadataRecorder(firstNight, firstRotator.Object, "plan-night1.json", paths.LivePath, paths.ArchivedPath);
+                var firstCenterAndRotate = FindCenterAndRotate(firstNight);
+                Assert.NotNull(firstCenterAndRotate);
+                firstCenterAndRotate.Status = SequenceEntityStatus.FINISHED;
+
+                // A second, independent recorder construction against the same live path (a later
+                // night) must accumulate rather than reset the file.
+                var secondNight = importer.Import(BuildPlanJson(BuildTargetJson("M 16", 60.0, "OIII")));
+                var secondRotator = new Mock<IRotatorMediator>();
+                secondRotator.Setup(r => r.GetInfo()).Returns(new RotatorInfo { MechanicalPosition = 75.0f });
+                new NightFrontMetadataRecorder(secondNight, secondRotator.Object, "plan-night2.json", paths.LivePath, paths.ArchivedPath);
+                var secondCenterAndRotate = FindCenterAndRotate(secondNight);
+                Assert.NotNull(secondCenterAndRotate);
+                secondCenterAndRotate.Status = SequenceEntityStatus.FINISHED;
+
+                var metadata = NightFrontMetadataStore.Load(paths.LivePath);
+                Assert.Equal(2, metadata.CalibrationRequirements.Count);
+                Assert.Contains(metadata.CalibrationRequirements, r => r.Filter == "Ha");
+                Assert.Contains(metadata.CalibrationRequirements, r => r.Filter == "OIII");
+            } finally {
+                DeletePaths(paths);
             }
         }
 

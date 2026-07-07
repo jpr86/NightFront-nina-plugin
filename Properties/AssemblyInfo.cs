@@ -59,6 +59,10 @@ Add a NightFront Container to your sequence, then place a Nightly Update instruc
 // to COM components.  If you need to access a type in this assembly from
 // COM, set the ComVisible attribute to true on that type.
 [assembly: ComVisible(false)]
+
+// Lets NightFront.Tests exercise internal types directly (e.g. the generated Settings class),
+// rather than every test needing a public surface just for testability.
+[assembly: InternalsVisibleTo("NightFront.Tests")]
 // [Unused]
 [assembly: AssemblyConfiguration("")]
 // [Unused]

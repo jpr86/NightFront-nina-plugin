@@ -172,15 +172,7 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
             var folder = Settings.Default.NightFrontDataFolder;
             var todayToken = DateTime.Now.ToString("yyyy-MM-dd");
 
-            string matchedFile = null;
-            if (!string.IsNullOrWhiteSpace(folder) && Directory.Exists(folder)) {
-                // Exclude the .metadata.json sidecar WriteMetadataFile writes into this same folder -
-                // its name is derived from the plan file's and so also contains todayToken, and would
-                // otherwise be a candidate match on a same-day re-run.
-                matchedFile = Directory.EnumerateFiles(folder, "*.json")
-                    .Where(f => !f.EndsWith(".metadata.json", StringComparison.OrdinalIgnoreCase))
-                    .FirstOrDefault(f => Path.GetFileName(f).Contains(todayToken));
-            }
+            var matchedFile = NightFrontMetadataPaths.FindTodaysPlanFile(folder, DateTime.Now);
 
             if (matchedFile == null) {
                 LastRunSucceeded = false;
@@ -211,8 +203,12 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                 // Watches the imported CenterAndRotate instructions as the night's imaging actually
                 // runs and writes the metadata file itself once each target's rotation is measured -
                 // see NightFrontMetadataRecorder for why this can't be done up front from the plan.
-                var metadataPath = Path.Combine(folder, Path.GetFileNameWithoutExtension(matchedFile) + ".metadata.json");
-                new NightFrontMetadataRecorder(imported, rotatorMediator, Path.GetFileName(matchedFile), metadataPath);
+                // The base name is derived from today's date stripped out of the plan filename, so
+                // the same metadata file accumulates across nights instead of one file per plan.
+                var baseName = NightFrontMetadataPaths.DeriveStableBaseName(Path.GetFileNameWithoutExtension(matchedFile), todayToken);
+                var livePath = NightFrontMetadataPaths.GetLiveMetadataPath(folder, baseName);
+                var archivedPath = NightFrontMetadataPaths.GetArchivedMetadataPath(folder);
+                new NightFrontMetadataRecorder(imported, rotatorMediator, Path.GetFileName(matchedFile), livePath, archivedPath);
 
                 Notification.ShowSuccess($"NightFront: imported plan for {todayToken} ({imported.Count} target(s)).");
             } catch (OperationCanceledException) {
