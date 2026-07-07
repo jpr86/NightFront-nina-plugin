@@ -5,11 +5,13 @@
     xmlns:conv="clr-namespace:JeffRidder.NINA.Nightfront.Converters"
     xmlns:local="clr-namespace:JeffRidder.NINA.Nightfront.Sequencer"
     xmlns:mini="clr-namespace:NINA.View.Sequencer.MiniSequencer;assembly=NINA.Sequencer"
-    xmlns:nina="clr-namespace:NINA.View.Sequencer;assembly=NINA.Sequencer">
+    xmlns:nina="clr-namespace:NINA.View.Sequencer;assembly=NINA.Sequencer"
+    xmlns:ninactrl="clr-namespace:NINA.CustomControlLibrary;assembly=NINA.CustomControlLibrary">
     <conv:NightFrontRunStatusToBrushConverter x:Key="NightFrontRunStatusToBrushConverter" />
     <conv:SequenceEntityStatusToBrushConverter x:Key="SequenceEntityStatusToBrushConverter" />
     <conv:InputCoordinatesToRaDecTextConverter x:Key="InputCoordinatesToRaDecTextConverter" />
     <conv:TargetTimeWindowConverter x:Key="TargetTimeWindowConverter" />
+    <conv:NightFrontPercentageConverter x:Key="NightFrontPercentageConverter" />
 
     <!--  Shared icon for both NightFront sequencer classes: a monochrome silhouette of the app's
           comet mark (Resources\NightFrontIcon.png) - a rounded diagonal tail capped by a circular
@@ -202,7 +204,57 @@
     <DataTemplate DataType="{x:Type local:NightFrontSkyFlatsInstruction}">
         <nina:SequenceBlockView>
             <nina:SequenceBlockView.SequenceItemContent>
-                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource NightFrontBaseNameRow}" />
+                <StackPanel Orientation="Vertical">
+                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource NightFrontBaseNameRow}" />
+                    <WrapPanel Orientation="Horizontal">
+                        <TextBlock Margin="5,0,0,0" VerticalAlignment="Center" Text="Min exposure" />
+                        <ninactrl:UnitTextBox
+                            MinWidth="40"
+                            Margin="5,0,0,0"
+                            VerticalAlignment="Center"
+                            ninactrl:UnitTextBox.Unit="s"
+                            Text="{Binding MinExposure}"
+                            TextAlignment="Right" />
+                        <TextBlock Margin="7.5,0,7.5,0" HorizontalAlignment="Center" VerticalAlignment="Center" Text="|" />
+                        <TextBlock Margin="5,0,0,0" VerticalAlignment="Center" Text="Max exposure" />
+                        <ninactrl:UnitTextBox
+                            MinWidth="40"
+                            Margin="5,0,0,0"
+                            VerticalAlignment="Center"
+                            ninactrl:UnitTextBox.Unit="s"
+                            Text="{Binding MaxExposure}"
+                            TextAlignment="Right" />
+                        <TextBlock Margin="7.5,0,7.5,0" HorizontalAlignment="Center" VerticalAlignment="Center" Text="|" />
+                        <TextBlock Margin="5,0,0,0" VerticalAlignment="Center" Text="Mean target" />
+                        <ninactrl:UnitTextBox
+                            MinWidth="40"
+                            Margin="5,0,0,0"
+                            VerticalAlignment="Center"
+                            ninactrl:UnitTextBox.Unit="%"
+                            Text="{Binding HistogramTargetPercentage, Converter={StaticResource NightFrontPercentageConverter}, UpdateSourceTrigger=PropertyChanged}"
+                            TextAlignment="Right" />
+                        <TextBlock Margin="7.5,0,7.5,0" HorizontalAlignment="Center" VerticalAlignment="Center" Text="|" />
+                        <TextBlock Margin="5,0,0,0" VerticalAlignment="Center" Text="Mean tolerance" />
+                        <ninactrl:UnitTextBox
+                            MinWidth="40"
+                            Margin="5,0,0,0"
+                            VerticalAlignment="Center"
+                            ninactrl:UnitTextBox.Unit="%"
+                            Text="{Binding HistogramTolerancePercentage, Converter={StaticResource NightFrontPercentageConverter}, UpdateSourceTrigger=PropertyChanged}"
+                            TextAlignment="Right" />
+                        <TextBlock Margin="7.5,0,7.5,0" HorizontalAlignment="Center" VerticalAlignment="Center" Text="|" />
+                        <TextBlock Margin="5,0,0,0" VerticalAlignment="Center" Text="Dither" />
+                        <CheckBox Margin="5,0,0,0" VerticalAlignment="Center" IsChecked="{Binding ShouldDither}" />
+                        <TextBlock Margin="7.5,0,7.5,0" HorizontalAlignment="Center" VerticalAlignment="Center" Text="|" />
+                        <TextBlock Margin="5,0,0,0" VerticalAlignment="Center" Text="Amount" />
+                        <ninactrl:UnitTextBox
+                            MinWidth="40"
+                            Margin="5,0,0,0"
+                            VerticalAlignment="Center"
+                            Text="{Binding Amount}"
+                            TextAlignment="Right" />
+                    </WrapPanel>
+                </StackPanel>
             </nina:SequenceBlockView.SequenceItemContent>
         </nina:SequenceBlockView>
     </DataTemplate>
@@ -218,7 +270,18 @@
     <DataTemplate DataType="{x:Type local:NightFrontTrainedFlatsInstruction}">
         <nina:SequenceBlockView>
             <nina:SequenceBlockView.SequenceItemContent>
-                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource NightFrontBaseNameRow}" />
+                <StackPanel Orientation="Vertical">
+                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource NightFrontBaseNameRow}" />
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Margin="5,0,0,0" VerticalAlignment="Center" Text="Amount" />
+                        <ninactrl:UnitTextBox
+                            MinWidth="40"
+                            Margin="5,0,0,0"
+                            VerticalAlignment="Center"
+                            Text="{Binding Amount}"
+                            TextAlignment="Right" />
+                    </StackPanel>
+                </StackPanel>
             </nina:SequenceBlockView.SequenceItemContent>
         </nina:SequenceBlockView>
     </DataTemplate>
@@ -232,10 +295,34 @@
     </DataTemplate>
 
     <DataTemplate DataType="{x:Type local:NightFrontWhileSameRotationCondition}">
-        <ContentControl Content="{Binding}" ContentTemplate="{StaticResource NightFrontBaseNameRow}" />
+        <nina:SequenceBlockView>
+            <nina:SequenceBlockView.SequenceItemContent>
+                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource NightFrontBaseNameRow}" />
+            </nina:SequenceBlockView.SequenceItemContent>
+        </nina:SequenceBlockView>
+    </DataTemplate>
+
+    <DataTemplate x:Key="JeffRidder.NINA.Nightfront.Sequencer.NightFrontWhileSameRotationCondition_Mini">
+        <mini:MiniCondition>
+            <mini:MiniCondition.ConditionProgressContent>
+                <TextBlock VerticalAlignment="Center" Text="While Same Rotation" />
+            </mini:MiniCondition.ConditionProgressContent>
+        </mini:MiniCondition>
     </DataTemplate>
 
     <DataTemplate DataType="{x:Type local:NightFrontWhileCalibrationRemainsCondition}">
-        <ContentControl Content="{Binding}" ContentTemplate="{StaticResource NightFrontBaseNameRow}" />
+        <nina:SequenceBlockView>
+            <nina:SequenceBlockView.SequenceItemContent>
+                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource NightFrontBaseNameRow}" />
+            </nina:SequenceBlockView.SequenceItemContent>
+        </nina:SequenceBlockView>
+    </DataTemplate>
+
+    <DataTemplate x:Key="JeffRidder.NINA.Nightfront.Sequencer.NightFrontWhileCalibrationRemainsCondition_Mini">
+        <mini:MiniCondition>
+            <mini:MiniCondition.ConditionProgressContent>
+                <TextBlock VerticalAlignment="Center" Text="While Calibration Remains" />
+            </mini:MiniCondition.ConditionProgressContent>
+        </mini:MiniCondition>
     </DataTemplate>
 </ResourceDictionary>

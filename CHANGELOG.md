@@ -1,5 +1,10 @@
 ﻿# NightFront
 
+## 1.0.5.0
+- Fixed NightFront While Same Rotation and While Calibration Remains showing up with no icon or name in the sequencer's Loop Conditions list - their templates were missing the SequenceBlockView wrapper that draws that chrome, unlike every other item/condition. Added their mini-sequencer templates too.
+- NightFront Sky Flats and NightFront Trained Flats now expose their actual editable fields (min/max exposure, histogram mean target/tolerance, dither, amount for Sky Flats; amount for Trained Flats) in the sequencer - previously only the metadata file name was shown, with no way to configure them.
+- Bumped the plugin's version numbering to align with the NightFront app's own version scheme.
+
 ## 1.0.0.8
 - Removed the example FITS-keyword/image-pattern demo left over from the plugin template. It was injecting placeholder `STRKEYWD`/`INTKEYWD`/`DBLKEYWD` header values and a `$$EXAMPLEPATTERN$$` file pattern option into every saved image; none of it was NightFront behavior.
 - Removed dead Entity Framework/SQLite configuration from `app.config` carried over from the template; NightFront has no such dependency.
