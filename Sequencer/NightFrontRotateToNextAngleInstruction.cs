@@ -14,10 +14,10 @@ using System.Threading.Tasks;
 namespace JeffRidder.NINA.Nightfront.Sequencer {
 
     /// <summary>
-    /// Rotates to the sky angle of the next outstanding calibration requirement (the head of the
-    /// accumulated calibration-metadata file, rounded to the nearest whole degree), without consuming
-    /// it - unlike NightFront Sky Flats/Trained Flats, this instruction only peeks the requirement; it
-    /// doesn't claim or archive it.
+    /// Rotates to the sky angle of the next outstanding calibration requirement (per the configured
+    /// flat filter order, rounded to the nearest whole degree), without consuming it - unlike
+    /// NightFront Sky Flats/Trained Flats, this instruction only peeks the requirement; it doesn't
+    /// claim or complete it.
     /// </summary>
     [ExportMetadata("Name", "NightFront Rotate to Next Angle")]
     [ExportMetadata("Description", "Rotates to the mechanical angle of the next outstanding calibration requirement in the NightFront calibration-metadata file, rounded to the nearest whole degree.")]
@@ -57,7 +57,8 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                     issues.Add(issue);
                 } else {
                     var livePath = NightFrontMetadataPaths.GetLiveMetadataPath(folder, resolvedBaseName);
-                    if (NightFrontMetadataStore.PeekNext(livePath) == null) {
+                    var filterOrder = NightFrontFilterOrder.Parse(Settings.Default.FlatFilterOrder);
+                    if (NightFrontMetadataStore.PeekNext(livePath, filterOrder) == null) {
                         issues.Add("No calibration requirements remain in the NightFront calibration-metadata file.");
                     }
                 }
@@ -75,7 +76,8 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
             }
 
             var livePath = NightFrontMetadataPaths.GetLiveMetadataPath(folder, resolvedBaseName);
-            var entry = NightFrontMetadataStore.PeekNext(livePath)
+            var filterOrder = NightFrontFilterOrder.Parse(Settings.Default.FlatFilterOrder);
+            var entry = NightFrontMetadataStore.PeekNext(livePath, filterOrder)
                 ?? throw new InvalidOperationException("No calibration requirements remain in the NightFront calibration-metadata file.");
 
             var angle = (float)Math.Round(entry.RotationAngle, MidpointRounding.AwayFromZero);

@@ -19,6 +19,22 @@
                     Command="{Binding SelectNightFrontDataFolderCommand}"
                     Content="Browse..." />
             </StackPanel>
+            <StackPanel Margin="0,5,0,0" Orientation="Horizontal">
+                <TextBlock VerticalAlignment="Center" Text="Flat Filter Order" />
+                <TextBox
+                    MinWidth="250"
+                    Margin="5,0,0,0"
+                    ToolTip="Comma-separated filter names, e.g. L, B, G, R, OIII, Ha, SII. Determines the order sky/trained flats are shot in, regardless of the order in the calibration-metadata file. Leave blank to use the order requirements were recorded."
+                    Text="{Binding FlatFilterOrder, UpdateSourceTrigger=PropertyChanged}" />
+            </StackPanel>
+            <StackPanel Margin="0,5,0,0" Orientation="Horizontal">
+                <TextBlock VerticalAlignment="Center" Text="Flat Refresh Days" />
+                <TextBox
+                    MinWidth="50"
+                    Margin="5,0,0,0"
+                    ToolTip="Number of days after a calibration requirement's flats were completed before it's dropped so it can be reshot."
+                    Text="{Binding FlatRefreshDays, UpdateSourceTrigger=PropertyChanged}" />
+            </StackPanel>
         </StackPanel>
     </DataTemplate>
 </ResourceDictionary>

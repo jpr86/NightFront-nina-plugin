@@ -46,6 +46,33 @@ namespace JeffRidder.NINA.Nightfront {
             }
         }
 
+        // Comma-separated filter names (e.g. "L, B, G, R, OIII, Ha, SII") giving the priority order
+        // NightFrontMetadataStore picks the next outstanding calibration requirement in - broadband
+        // filters typically need to be shot while the twilight sky is still brighter than narrowband.
+        public string FlatFilterOrder {
+            get {
+                return Settings.Default.FlatFilterOrder;
+            }
+            set {
+                Settings.Default.FlatFilterOrder = value;
+                CoreUtil.SaveSettings(Settings.Default);
+                RaisePropertyChanged();
+            }
+        }
+
+        // How many days after a calibration requirement's flats were completed before it's pruned so
+        // it can be reshot - see NightFrontMetadataStore.PruneStaleCompleted.
+        public int FlatRefreshDays {
+            get {
+                return Settings.Default.FlatRefreshDays;
+            }
+            set {
+                Settings.Default.FlatRefreshDays = value;
+                CoreUtil.SaveSettings(Settings.Default);
+                RaisePropertyChanged();
+            }
+        }
+
         private ICommand selectNightFrontDataFolderCommand;
 
         public ICommand SelectNightFrontDataFolderCommand => selectNightFrontDataFolderCommand ??= new CommunityToolkit.Mvvm.Input.RelayCommand(SelectNightFrontDataFolder);

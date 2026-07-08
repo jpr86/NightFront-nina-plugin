@@ -2,6 +2,7 @@ using JeffRidder.NINA.Nightfront.Import;
 using JeffRidder.NINA.Nightfront.Properties;
 using JeffRidder.NINA.Nightfront.Sequencer;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using Xunit;
 
@@ -24,14 +25,14 @@ namespace JeffRidder.NINA.Nightfront.Tests {
             try {
                 Settings.Default.NightFrontDataFolder = folder;
                 var livePath = NightFrontMetadataPaths.GetLiveMetadataPath(folder, "TargetsForTonight");
-                var archivedPath = NightFrontMetadataPaths.GetArchivedMetadataPath(folder);
-                NightFrontMetadataStore.TryAddCalibrationRequirement(livePath, archivedPath, "Ha", 90.0, -1, -1);
+                NightFrontMetadataStore.TryAddCalibrationRequirement(livePath, "Ha", 90.0, -1, -1);
 
                 var condition = new NightFrontWhileCalibrationRemainsCondition();
 
                 Assert.True(condition.Check(null, null));
 
-                NightFrontMetadataStore.ArchiveClaimed(archivedPath, NightFrontMetadataStore.ClaimNext(livePath));
+                var claimed = NightFrontMetadataStore.ClaimNext(livePath, new List<string>());
+                NightFrontMetadataStore.MarkCompleted(livePath, claimed.Id);
 
                 Assert.False(condition.Check(null, null));
             } finally {

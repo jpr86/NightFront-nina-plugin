@@ -9,12 +9,13 @@ using System.ComponentModel.Composition;
 namespace JeffRidder.NINA.Nightfront.Sequencer {
 
     /// <summary>
-    /// Loops while the head entry of the accumulated calibration-metadata file keeps the same
-    /// rotation angle (rounded to the nearest whole degree) as the first entry seen this loop run;
-    /// stops the moment the head entry's rounded angle would differ. Since the nested flat
-    /// instruction (NightFront Sky/Trained Flats) removes each entry as it completes it, "the head
-    /// entry" always reflects what's left to do. Reads fresh via NightFrontMetadataStore on every
-    /// check rather than tracking an iteration counter.
+    /// Loops while the next outstanding entry of the accumulated calibration-metadata file (per the
+    /// configured flat filter order - see NightFrontMetadataStore.SelectNext) keeps the same rotation
+    /// angle (rounded to the nearest whole degree) as the first entry seen this loop run; stops the
+    /// moment that angle would differ. Since the nested flat instruction (NightFront Sky/Trained
+    /// Flats) marks each entry completed as it finishes it, "the next outstanding entry" always
+    /// reflects what's left to do. Reads fresh via NightFrontMetadataStore on every check rather than
+    /// tracking an iteration counter.
     ///
     /// Applied to todos/TargetsForTonight_2026-07-06.metadata.json (L/B/OIII all ~179.9deg, rounding
     /// to 180deg; Ha ~90.1deg, rounding to 90deg; in that list order): baseline is set to 180deg from
@@ -57,7 +58,8 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
             }
 
             var livePath = NightFrontMetadataPaths.GetLiveMetadataPath(folder, resolvedBaseName);
-            var entry = NightFrontMetadataStore.PeekNext(livePath);
+            var filterOrder = NightFrontFilterOrder.Parse(Settings.Default.FlatFilterOrder);
+            var entry = NightFrontMetadataStore.PeekNext(livePath, filterOrder);
             if (entry == null) {
                 return false;
             }

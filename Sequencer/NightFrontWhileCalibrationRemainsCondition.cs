@@ -8,10 +8,10 @@ using System.ComponentModel.Composition;
 namespace JeffRidder.NINA.Nightfront.Sequencer {
 
     /// <summary>
-    /// Loops while at least one calibration requirement remains in the accumulated
-    /// calibration-metadata file - reads fresh via NightFrontMetadataStore on every check rather than
-    /// tracking an iteration counter, since the nested flat instruction (NightFront Sky/Trained
-    /// Flats) is what actually removes entries as it completes each one.
+    /// Loops while at least one outstanding (not yet completed) calibration requirement remains in
+    /// the accumulated calibration-metadata file - reads fresh via NightFrontMetadataStore on every
+    /// check rather than tracking an iteration counter, since the nested flat instruction (NightFront
+    /// Sky/Trained Flats) is what actually marks entries completed as it finishes each one.
     /// </summary>
     [ExportMetadata("Name", "NightFront While Calibration Remains")]
     [ExportMetadata("Description", "Loops while at least one calibration requirement remains in the NightFront calibration-metadata file.")]
@@ -47,7 +47,8 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
             }
 
             var livePath = NightFrontMetadataPaths.GetLiveMetadataPath(folder, resolvedBaseName);
-            return NightFrontMetadataStore.PeekNext(livePath) != null;
+            var filterOrder = NightFrontFilterOrder.Parse(Settings.Default.FlatFilterOrder);
+            return NightFrontMetadataStore.PeekNext(livePath, filterOrder) != null;
         }
 
         public override object Clone() {

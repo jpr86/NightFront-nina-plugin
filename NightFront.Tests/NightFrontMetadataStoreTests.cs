@@ -1,6 +1,7 @@
 using JeffRidder.NINA.Nightfront.Import;
 using Newtonsoft.Json;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Xunit;
@@ -9,16 +10,10 @@ namespace JeffRidder.NINA.Nightfront.Tests {
 
     public class NightFrontMetadataStoreTests {
 
-        private static (string LivePath, string ArchivedPath) CreateTempPaths() {
-            var id = Guid.NewGuid();
-            return (
-                Path.Combine(Path.GetTempPath(), id + ".metadata.json"),
-                Path.Combine(Path.GetTempPath(), id + ".archived.metadata.json"));
-        }
+        private static readonly List<string> NoFilterOrder = new List<string>();
 
-        private static void DeletePaths((string LivePath, string ArchivedPath) paths) {
-            File.Delete(paths.LivePath);
-            File.Delete(paths.ArchivedPath);
+        private static string CreateTempPath() {
+            return Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".metadata.json");
         }
 
         [Fact]
@@ -54,158 +49,253 @@ namespace JeffRidder.NINA.Nightfront.Tests {
         }
 
         [Fact]
-        public void TryAddCalibrationRequirement_DedupesWithinOneDegree_SameFilterGainOffset() {
-            var paths = CreateTempPaths();
+        public void Load_OldSchemaFileWithoutId_AssignsANonEmptyId() {
+            var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".metadata.json");
             try {
-                Assert.True(NightFrontMetadataStore.TryAddCalibrationRequirement(paths.LivePath, paths.ArchivedPath, "Ha", 30.0, 100, 10));
-                var added = NightFrontMetadataStore.TryAddCalibrationRequirement(paths.LivePath, paths.ArchivedPath, "Ha", 30.4, 100, 10);
+                var oldSchemaJson = @"{
+                  ""SchemaVersion"": 3,
+                  ""CalibrationRequirements"": [ { ""Filter"": ""Ha"", ""RotationAngle"": 90.1, ""Gain"": -1, ""Offset"": -1 } ],
+                  ""Targets"": []
+                }";
+                File.WriteAllText(path, oldSchemaJson);
+
+                var metadata = NightFrontMetadataStore.Load(path);
+
+                var requirement = Assert.Single(metadata.CalibrationRequirements);
+                Assert.NotEqual(Guid.Empty, requirement.Id);
+            } finally {
+                File.Delete(path);
+            }
+        }
+
+        [Fact]
+        public void TryAddCalibrationRequirement_DedupesWithinOneDegree_SameFilterGainOffset() {
+            var path = CreateTempPath();
+            try {
+                Assert.True(NightFrontMetadataStore.TryAddCalibrationRequirement(path, "Ha", 30.0, 100, 10));
+                var added = NightFrontMetadataStore.TryAddCalibrationRequirement(path, "Ha", 30.4, 100, 10);
 
                 Assert.False(added);
-                Assert.Single(NightFrontMetadataStore.Load(paths.LivePath).CalibrationRequirements);
+                Assert.Single(NightFrontMetadataStore.Load(path).CalibrationRequirements);
             } finally {
-                DeletePaths(paths);
+                File.Delete(path);
             }
         }
 
         [Fact]
         public void TryAddCalibrationRequirement_DoesNotDedupe_WhenGainDiffers() {
-            var paths = CreateTempPaths();
+            var path = CreateTempPath();
             try {
-                Assert.True(NightFrontMetadataStore.TryAddCalibrationRequirement(paths.LivePath, paths.ArchivedPath, "Ha", 30.0, 100, 10));
-                var added = NightFrontMetadataStore.TryAddCalibrationRequirement(paths.LivePath, paths.ArchivedPath, "Ha", 30.0, 200, 10);
+                Assert.True(NightFrontMetadataStore.TryAddCalibrationRequirement(path, "Ha", 30.0, 100, 10));
+                var added = NightFrontMetadataStore.TryAddCalibrationRequirement(path, "Ha", 30.0, 200, 10);
 
                 Assert.True(added);
-                Assert.Equal(2, NightFrontMetadataStore.Load(paths.LivePath).CalibrationRequirements.Count);
+                Assert.Equal(2, NightFrontMetadataStore.Load(path).CalibrationRequirements.Count);
             } finally {
-                DeletePaths(paths);
+                File.Delete(path);
             }
         }
 
         [Fact]
         public void TryAddCalibrationRequirement_DoesNotDedupe_WhenOffsetDiffers() {
-            var paths = CreateTempPaths();
+            var path = CreateTempPath();
             try {
-                Assert.True(NightFrontMetadataStore.TryAddCalibrationRequirement(paths.LivePath, paths.ArchivedPath, "Ha", 30.0, 100, 10));
-                var added = NightFrontMetadataStore.TryAddCalibrationRequirement(paths.LivePath, paths.ArchivedPath, "Ha", 30.0, 100, 20);
+                Assert.True(NightFrontMetadataStore.TryAddCalibrationRequirement(path, "Ha", 30.0, 100, 10));
+                var added = NightFrontMetadataStore.TryAddCalibrationRequirement(path, "Ha", 30.0, 100, 20);
 
                 Assert.True(added);
-                Assert.Equal(2, NightFrontMetadataStore.Load(paths.LivePath).CalibrationRequirements.Count);
+                Assert.Equal(2, NightFrontMetadataStore.Load(path).CalibrationRequirements.Count);
             } finally {
-                DeletePaths(paths);
+                File.Delete(path);
             }
         }
 
         [Fact]
-        public void TryAddCalibrationRequirement_RefusesToAdd_WhenEquivalentEntryAlreadyArchived() {
-            var paths = CreateTempPaths();
+        public void TryAddCalibrationRequirement_SetsIdAndDateAdded() {
+            var path = CreateTempPath();
             try {
-                var claimed = NightFrontMetadataStore.ClaimNext(paths.LivePath); // no-op, nothing to claim yet
-                Assert.Null(claimed);
+                NightFrontMetadataStore.TryAddCalibrationRequirement(path, "Ha", 30.0, 100, 10);
 
-                Assert.True(NightFrontMetadataStore.TryAddCalibrationRequirement(paths.LivePath, paths.ArchivedPath, "Ha", 30.0, 100, 10));
-                var toArchive = NightFrontMetadataStore.ClaimNext(paths.LivePath);
-                Assert.NotNull(toArchive);
-                NightFrontMetadataStore.ArchiveClaimed(paths.ArchivedPath, toArchive);
+                var requirement = Assert.Single(NightFrontMetadataStore.Load(path).CalibrationRequirements);
+                Assert.NotEqual(Guid.Empty, requirement.Id);
+                Assert.True(requirement.DateAdded > DateTime.Now.AddMinutes(-1));
+            } finally {
+                File.Delete(path);
+            }
+        }
 
-                // Same (filter, angle within 1 degree, gain, offset) is already archived - must not
-                // be re-added to the live file (item 2's "check both files" rule).
-                var added = NightFrontMetadataStore.TryAddCalibrationRequirement(paths.LivePath, paths.ArchivedPath, "Ha", 30.2, 100, 10);
+        [Fact]
+        public void TryAddCalibrationRequirement_RefusesToAdd_WhenEquivalentEntryAlreadyCompleted() {
+            var path = CreateTempPath();
+            try {
+                NightFrontMetadataStore.TryAddCalibrationRequirement(path, "Ha", 30.0, 100, 10);
+                var claimed = NightFrontMetadataStore.ClaimNext(path, NoFilterOrder);
+                Assert.NotNull(claimed);
+                NightFrontMetadataStore.MarkCompleted(path, claimed.Id);
+
+                // Same (filter, angle within 1 degree, gain, offset) is already completed - must not
+                // be re-added, since completed entries stay in the same file rather than being
+                // archived elsewhere.
+                var added = NightFrontMetadataStore.TryAddCalibrationRequirement(path, "Ha", 30.2, 100, 10);
 
                 Assert.False(added);
-                Assert.Empty(NightFrontMetadataStore.Load(paths.LivePath).CalibrationRequirements);
+                Assert.Single(NightFrontMetadataStore.Load(path).CalibrationRequirements);
             } finally {
-                DeletePaths(paths);
+                File.Delete(path);
             }
         }
 
         [Fact]
         public void ClaimNext_IsAtomic_SecondCallGetsNextEntry_NotTheSameOne() {
-            var paths = CreateTempPaths();
+            var path = CreateTempPath();
             try {
-                NightFrontMetadataStore.TryAddCalibrationRequirement(paths.LivePath, paths.ArchivedPath, "L", 180.0, -1, -1);
-                NightFrontMetadataStore.TryAddCalibrationRequirement(paths.LivePath, paths.ArchivedPath, "B", 180.0, -1, -1);
+                NightFrontMetadataStore.TryAddCalibrationRequirement(path, "L", 180.0, -1, -1);
+                NightFrontMetadataStore.TryAddCalibrationRequirement(path, "B", 180.0, -1, -1);
 
-                var first = NightFrontMetadataStore.ClaimNext(paths.LivePath);
-                var second = NightFrontMetadataStore.ClaimNext(paths.LivePath);
-                var third = NightFrontMetadataStore.ClaimNext(paths.LivePath);
+                var first = NightFrontMetadataStore.ClaimNext(path, NoFilterOrder);
+                var second = NightFrontMetadataStore.ClaimNext(path, NoFilterOrder);
+                var third = NightFrontMetadataStore.ClaimNext(path, NoFilterOrder);
 
                 Assert.Equal("L", first.Filter);
                 Assert.Equal("B", second.Filter);
                 Assert.Null(third);
             } finally {
-                DeletePaths(paths);
+                File.Delete(path);
             }
         }
 
         [Fact]
-        public void RestoreClaimed_PutsEntryBackAtHead() {
-            var paths = CreateTempPaths();
+        public void ReleaseClaim_MakesEntryClaimableAgain() {
+            var path = CreateTempPath();
             try {
-                NightFrontMetadataStore.TryAddCalibrationRequirement(paths.LivePath, paths.ArchivedPath, "L", 180.0, -1, -1);
-                NightFrontMetadataStore.TryAddCalibrationRequirement(paths.LivePath, paths.ArchivedPath, "B", 180.0, -1, -1);
+                NightFrontMetadataStore.TryAddCalibrationRequirement(path, "L", 180.0, -1, -1);
+                NightFrontMetadataStore.TryAddCalibrationRequirement(path, "B", 180.0, -1, -1);
 
-                var claimed = NightFrontMetadataStore.ClaimNext(paths.LivePath);
+                var claimed = NightFrontMetadataStore.ClaimNext(path, NoFilterOrder);
                 Assert.Equal("L", claimed.Filter);
 
-                NightFrontMetadataStore.RestoreClaimed(paths.LivePath, claimed);
+                NightFrontMetadataStore.ReleaseClaim(path, claimed.Id);
 
-                var requirements = NightFrontMetadataStore.Load(paths.LivePath).CalibrationRequirements;
+                var reclaimed = NightFrontMetadataStore.ClaimNext(path, NoFilterOrder);
+                Assert.Equal("L", reclaimed.Filter);
+
+                var requirements = NightFrontMetadataStore.Load(path).CalibrationRequirements;
                 Assert.Equal(2, requirements.Count);
-                Assert.Equal("L", requirements[0].Filter);
-                Assert.Equal("B", requirements[1].Filter);
+                Assert.Null(requirements.First(r => r.Filter == "L").FlatsCompletedDate);
             } finally {
-                DeletePaths(paths);
+                File.Delete(path);
             }
         }
 
         [Fact]
-        public void ArchiveClaimed_AppendsWithoutNeedingToReFindTheEntry() {
-            var paths = CreateTempPaths();
+        public void MarkCompleted_StampsFlatsCompletedDate_AndEntryStaysInTheFile() {
+            var path = CreateTempPath();
             try {
-                NightFrontMetadataStore.TryAddCalibrationRequirement(paths.LivePath, paths.ArchivedPath, "L", 180.0, -1, -1);
-                var claimed = NightFrontMetadataStore.ClaimNext(paths.LivePath);
+                NightFrontMetadataStore.TryAddCalibrationRequirement(path, "L", 180.0, -1, -1);
+                var claimed = NightFrontMetadataStore.ClaimNext(path, NoFilterOrder);
 
-                NightFrontMetadataStore.ArchiveClaimed(paths.ArchivedPath, claimed);
+                NightFrontMetadataStore.MarkCompleted(path, claimed.Id);
 
-                var archived = NightFrontMetadataStore.Load(paths.ArchivedPath);
-                var entry = Assert.Single(archived.CalibrationRequirements);
-                Assert.Equal("L", entry.Filter);
-                Assert.Empty(NightFrontMetadataStore.Load(paths.LivePath).CalibrationRequirements);
+                var requirement = Assert.Single(NightFrontMetadataStore.Load(path).CalibrationRequirements);
+                Assert.Equal("L", requirement.Filter);
+                Assert.NotNull(requirement.FlatsCompletedDate);
+                Assert.False(requirement.Claimed);
+                Assert.Null(NightFrontMetadataStore.PeekNext(path, NoFilterOrder));
             } finally {
-                DeletePaths(paths);
+                File.Delete(path);
+            }
+        }
+
+        [Fact]
+        public void PruneStaleCompleted_RemovesOnlyCompletedEntriesOlderThanRefreshDays() {
+            var path = CreateTempPath();
+            try {
+                NightFrontMetadataStore.TryAddCalibrationRequirement(path, "Stale", 10.0, -1, -1);
+                NightFrontMetadataStore.TryAddCalibrationRequirement(path, "Recent", 20.0, -1, -1);
+                NightFrontMetadataStore.TryAddCalibrationRequirement(path, "Pending", 30.0, -1, -1);
+
+                var metadata = NightFrontMetadataStore.Load(path);
+                metadata.CalibrationRequirements.First(r => r.Filter == "Stale").FlatsCompletedDate = DateTime.Now.AddDays(-31);
+                metadata.CalibrationRequirements.First(r => r.Filter == "Recent").FlatsCompletedDate = DateTime.Now.AddDays(-1);
+                File.WriteAllText(path, JsonConvert.SerializeObject(metadata));
+
+                NightFrontMetadataStore.PruneStaleCompleted(path, refreshDays: 30);
+
+                var remaining = NightFrontMetadataStore.Load(path).CalibrationRequirements;
+                Assert.Equal(2, remaining.Count);
+                Assert.Contains(remaining, r => r.Filter == "Recent");
+                Assert.Contains(remaining, r => r.Filter == "Pending");
+            } finally {
+                File.Delete(path);
             }
         }
 
         [Fact]
         public void UpsertTargetMetadata_ReplacesExistingEntryByName_NotAppendingADuplicate() {
-            var paths = CreateTempPaths();
+            var path = CreateTempPath();
             try {
-                NightFrontMetadataStore.UpsertTargetMetadata(paths.LivePath, "M 16", new[] { "Ha" });
-                NightFrontMetadataStore.UpsertTargetMetadata(paths.LivePath, "M 16", new[] { "Ha", "OIII" });
+                NightFrontMetadataStore.UpsertTargetMetadata(path, "M 16", new[] { "Ha" });
+                NightFrontMetadataStore.UpsertTargetMetadata(path, "M 16", new[] { "Ha", "OIII" });
 
-                var targets = NightFrontMetadataStore.Load(paths.LivePath).Targets;
+                var targets = NightFrontMetadataStore.Load(path).Targets;
                 var target = Assert.Single(targets);
                 Assert.Equal("M 16", target.TargetName);
                 Assert.Equal(new[] { "Ha", "OIII" }, target.Filters);
             } finally {
-                DeletePaths(paths);
+                File.Delete(path);
             }
         }
 
         [Fact]
-        public void PeekNext_DoesNotRemoveTheEntry() {
-            var paths = CreateTempPaths();
+        public void PeekNext_DoesNotRemoveOrClaimTheEntry() {
+            var path = CreateTempPath();
             try {
-                NightFrontMetadataStore.TryAddCalibrationRequirement(paths.LivePath, paths.ArchivedPath, "L", 180.0, -1, -1);
+                NightFrontMetadataStore.TryAddCalibrationRequirement(path, "L", 180.0, -1, -1);
 
-                var peeked1 = NightFrontMetadataStore.PeekNext(paths.LivePath);
-                var peeked2 = NightFrontMetadataStore.PeekNext(paths.LivePath);
+                var peeked1 = NightFrontMetadataStore.PeekNext(path, NoFilterOrder);
+                var peeked2 = NightFrontMetadataStore.PeekNext(path, NoFilterOrder);
 
                 Assert.Equal("L", peeked1.Filter);
                 Assert.Equal("L", peeked2.Filter);
-                Assert.Single(NightFrontMetadataStore.Load(paths.LivePath).CalibrationRequirements);
+                Assert.Single(NightFrontMetadataStore.Load(path).CalibrationRequirements);
             } finally {
-                DeletePaths(paths);
+                File.Delete(path);
+            }
+        }
+
+        [Fact]
+        public void ClaimNext_HonorsFilterOrder_OverInsertionOrder() {
+            var path = CreateTempPath();
+            try {
+                NightFrontMetadataStore.TryAddCalibrationRequirement(path, "Ha", 180.0, -1, -1);
+                NightFrontMetadataStore.TryAddCalibrationRequirement(path, "L", 180.0, -1, -1);
+                NightFrontMetadataStore.TryAddCalibrationRequirement(path, "OIII", 180.0, -1, -1);
+
+                var filterOrder = new List<string> { "L", "OIII", "Ha" };
+
+                Assert.Equal("L", NightFrontMetadataStore.ClaimNext(path, filterOrder).Filter);
+                Assert.Equal("OIII", NightFrontMetadataStore.ClaimNext(path, filterOrder).Filter);
+                Assert.Equal("Ha", NightFrontMetadataStore.ClaimNext(path, filterOrder).Filter);
+            } finally {
+                File.Delete(path);
+            }
+        }
+
+        [Fact]
+        public void ClaimNext_FiltersNotInOrderList_RankAfterListedFilters() {
+            var path = CreateTempPath();
+            try {
+                NightFrontMetadataStore.TryAddCalibrationRequirement(path, "Ha", 180.0, -1, -1);
+                NightFrontMetadataStore.TryAddCalibrationRequirement(path, "L", 180.0, -1, -1);
+
+                // "L" was added first but isn't in the filter order, so it ranks after "Ha", which is
+                // explicitly listed - "Ha" is claimed first even though it was added second.
+                var filterOrder = new List<string> { "Ha" };
+
+                Assert.Equal("Ha", NightFrontMetadataStore.ClaimNext(path, filterOrder).Filter);
+                Assert.Equal("L", NightFrontMetadataStore.ClaimNext(path, filterOrder).Filter);
+            } finally {
+                File.Delete(path);
             }
         }
     }

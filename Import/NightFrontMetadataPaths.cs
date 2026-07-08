@@ -41,7 +41,9 @@ namespace JeffRidder.NINA.Nightfront.Import {
         /// general date parser - matches the one concrete filename shape NightFrontApp's exporter
         /// produces. Returns the base name unchanged if the token isn't found verbatim, and falls
         /// back to "NightFront" if stripping would leave nothing or would leave the reserved
-        /// "archived" name (which collides with the shared archive file - see GetArchivedMetadataPath).
+        /// "archived" name (which collides with a legacy "archived.metadata.json" sidecar file that
+        /// may still be sitting in the folder from before metadata completion tracking moved into the
+        /// single live file - see GetLiveMetadataPath).
         /// </summary>
         public static string DeriveStableBaseName(string planFileBaseName, string todayToken) {
             if (string.IsNullOrEmpty(planFileBaseName) || string.IsNullOrEmpty(todayToken)) {
@@ -71,8 +73,8 @@ namespace JeffRidder.NINA.Nightfront.Import {
 
         /// <summary>Builds the live metadata path for <paramref name="baseName"/>. Throws if
         /// <paramref name="baseName"/> is the reserved "archived" name, which would otherwise resolve
-        /// to the exact same path as the shared archive file (see GetArchivedMetadataPath) and corrupt
-        /// both.</summary>
+        /// to the same path as a legacy "archived.metadata.json" sidecar file that older plugin
+        /// versions wrote (see IsArchiveFile) and corrupt it.</summary>
         public static string GetLiveMetadataPath(string folder, string baseName) {
             if (string.Equals(baseName, ReservedArchiveBaseName, StringComparison.OrdinalIgnoreCase)) {
                 throw new ArgumentException("\"archived\" cannot be used as a NightFront calibration-metadata name - it collides with the shared archived.metadata.json file. Choose a different name.", nameof(baseName));
@@ -80,18 +82,15 @@ namespace JeffRidder.NINA.Nightfront.Import {
             return Path.Combine(folder, baseName + LiveMetadataSuffix);
         }
 
-        /// <summary>One archive file shared by every metadata base name in the folder.</summary>
-        public static string GetArchivedMetadataPath(string folder) {
-            return Path.Combine(folder, ArchivedMetadataFileName);
-        }
-
         /// <summary>
         /// Resolves which live metadata file a calibration-consuming instruction/condition should
         /// use. <paramref name="explicitBaseName"/> wins verbatim if set (rejected via
         /// <paramref name="issue"/> if it's the reserved "archived" name). Otherwise scans the folder
-        /// for "*.metadata.json" files (excluding the shared archive file): exactly one match
-        /// resolves automatically; zero or more than one leaves <paramref name="issue"/> populated
-        /// with a message naming the candidates (or noting none exist) and returns null.
+        /// for "*.metadata.json" files (excluding a legacy "archived.metadata.json" sidecar file, if
+        /// one is still present from before completion tracking moved into the single live file):
+        /// exactly one match resolves automatically; zero or more than one leaves
+        /// <paramref name="issue"/> populated with a message naming the candidates (or noting none
+        /// exist) and returns null.
         /// </summary>
         public static string ResolveBaseName(string folder, string explicitBaseName, out string issue) {
             issue = null;
@@ -129,6 +128,10 @@ namespace JeffRidder.NINA.Nightfront.Import {
             return path.EndsWith(LiveMetadataSuffix, StringComparison.OrdinalIgnoreCase);
         }
 
+        /// <summary>NightFront no longer writes this file itself - completed calibration requirements
+        /// stay in the live file with FlatsCompletedDate stamped instead of being archived elsewhere.
+        /// This only guards against a leftover "archived.metadata.json" from an older plugin version
+        /// being misdetected as a live metadata candidate.</summary>
         private static bool IsArchiveFile(string path) {
             return string.Equals(Path.GetFileName(path), ArchivedMetadataFileName, StringComparison.OrdinalIgnoreCase);
         }

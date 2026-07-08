@@ -21,9 +21,10 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
 
     /// <summary>
     /// Shared orchestration for the two calibration-flat instructions (NightFront Sky Flats /
-    /// NightFront Trained Flats): both rotate to, then shoot flats for, the head entry of the
-    /// accumulated calibration-metadata file, then move that entry to the archive on success (item
-    /// 3d) or put it back on failure/cancellation.
+    /// NightFront Trained Flats): both rotate to, then shoot flats for, the next outstanding entry of
+    /// the accumulated calibration-metadata file (picked per the configured flat filter order - see
+    /// NightFrontMetadataStore.SelectNext), then stamp that entry's FlatsCompletedDate on success or
+    /// clear its claim on failure/cancellation so another attempt can pick it up again.
     ///
     /// The rotator child and the wrapped NINA flat instruction (SkyFlat/TrainedFlatExposure) are real,
     /// persistent children added via Add() in the constructor - not built-and-discarded per run - so
@@ -70,7 +71,8 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                     extraIssues.Add(issue);
                 } else {
                     var livePath = NightFrontMetadataPaths.GetLiveMetadataPath(folder, resolvedBaseName);
-                    if (NightFrontMetadataStore.PeekNext(livePath) == null) {
+                    var filterOrder = NightFrontFilterOrder.Parse(Settings.Default.FlatFilterOrder);
+                    if (NightFrontMetadataStore.PeekNext(livePath, filterOrder) == null) {
                         extraIssues.Add("No calibration requirements remain in the NightFront calibration-metadata file.");
                     }
                 }
@@ -92,9 +94,9 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
             }
 
             var livePath = NightFrontMetadataPaths.GetLiveMetadataPath(folder, resolvedBaseName);
-            var archivedPath = NightFrontMetadataPaths.GetArchivedMetadataPath(folder);
+            var filterOrder = NightFrontFilterOrder.Parse(Settings.Default.FlatFilterOrder);
 
-            var claimed = NightFrontMetadataStore.ClaimNext(livePath)
+            var claimed = NightFrontMetadataStore.ClaimNext(livePath, filterOrder)
                 ?? throw new InvalidOperationException("No calibration requirements remain in the NightFront calibration-metadata file.");
 
             try {
@@ -113,9 +115,9 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                     throw new InvalidOperationException("NightFront: capturing calibration flats failed.");
                 }
 
-                NightFrontMetadataStore.ArchiveClaimed(archivedPath, claimed);
+                NightFrontMetadataStore.MarkCompleted(livePath, claimed.Id);
             } catch {
-                NightFrontMetadataStore.RestoreClaimed(livePath, claimed);
+                NightFrontMetadataStore.ReleaseClaim(livePath, claimed.Id);
                 throw;
             }
         }

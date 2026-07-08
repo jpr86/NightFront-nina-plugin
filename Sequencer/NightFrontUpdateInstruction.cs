@@ -200,15 +200,21 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                 StatusMessage = $"Plan retrieved from file: {Path.GetFileName(matchedFile)}";
                 LastRunTimestamp = DateTime.Now;
 
-                // Watches the imported CenterAndRotate instructions as the night's imaging actually
-                // runs and writes the metadata file itself once each target's rotation is measured -
-                // see NightFrontMetadataRecorder for why this can't be done up front from the plan.
-                // The base name is derived from today's date stripped out of the plan filename, so
-                // the same metadata file accumulates across nights instead of one file per plan.
+                // Watches the imported TakeExposure instructions as the night's imaging actually
+                // runs and writes the metadata file itself once each exposure finishes - see
+                // NightFrontMetadataRecorder for why this can't be done up front from the plan. The
+                // base name is derived from today's date stripped out of the plan filename, so the
+                // same metadata file accumulates across nights instead of one file per plan.
                 var baseName = NightFrontMetadataPaths.DeriveStableBaseName(Path.GetFileNameWithoutExtension(matchedFile), todayToken);
                 var livePath = NightFrontMetadataPaths.GetLiveMetadataPath(folder, baseName);
-                var archivedPath = NightFrontMetadataPaths.GetArchivedMetadataPath(folder);
-                new NightFrontMetadataRecorder(imported, rotatorMediator, Path.GetFileName(matchedFile), livePath, archivedPath);
+
+                // Once-per-run housekeeping: drop calibration requirements that were completed long
+                // enough ago to need reshooting. If the underlying target/filter/rotation combo is
+                // still in use, NightFrontMetadataRecorder will simply re-add it as a fresh,
+                // outstanding requirement below.
+                NightFrontMetadataStore.PruneStaleCompleted(livePath, Settings.Default.FlatRefreshDays);
+
+                new NightFrontMetadataRecorder(imported, rotatorMediator, Path.GetFileName(matchedFile), livePath);
 
                 Notification.ShowSuccess($"NightFront: imported plan for {todayToken} ({imported.Count} target(s)).");
             } catch (OperationCanceledException) {

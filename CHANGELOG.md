@@ -1,5 +1,10 @@
 ﻿# NightFront
 
+## Unreleased
+- Fixed calibration metadata (measured rotation angle + filter/gain/offset) being recorded as soon as a target's CenterAndRotate finished, before any of its light exposures had actually completed. It's now recorded per filter, right after that filter's own exposure(s) finish - so a target whose sequence stops partway through its filter list still gets correct metadata for whichever filters actually completed, and never records a filter that hasn't been shot yet.
+- Replaced the separate `archived.metadata.json` file with completion tracking in the single live metadata file: every calibration requirement now carries a `DateAdded` and a `FlatsCompletedDate` (null until a Sky/Trained Flats instruction completes it). NightFront While Same Rotation/While Calibration Remains and the flats instructions all skip completed entries. A new "Flat Refresh Days" plugin option prunes completed entries older than that many days, so a stale one is naturally recreated (and reshot) the next time its target/filter/rotation combination is encountered.
+- Added a "Flat Filter Order" plugin option (comma-separated filter names, e.g. `L, B, G, R, OIII, Ha, SII`) that determines the order Sky Flats, Trained Flats, and their loop conditions claim outstanding calibration requirements in, regardless of the order they were recorded in - useful since twilight sky flats often need specific filters shot while the sky is a particular brightness.
+
 ## 1.0.5.0
 - Fixed NightFront While Same Rotation and While Calibration Remains showing up with no icon or name in the sequencer's Loop Conditions list - their templates were missing the SequenceBlockView wrapper that draws that chrome, unlike every other item/condition. Added their mini-sequencer templates too.
 - NightFront Sky Flats and NightFront Trained Flats now expose their actual editable fields (min/max exposure, histogram mean target/tolerance, dither, amount for Sky Flats; amount for Trained Flats) in the sequencer - previously only the metadata file name was shown, with no way to configure them.

@@ -8,21 +8,25 @@ using System.Linq;
 namespace JeffRidder.NINA.Nightfront.Import {
 
     /// <summary>
-    /// Centralizes every read/modify/write of a NightFrontPlanMetadata file (both the live
-    /// "&lt;baseName&gt;.metadata.json" file and the shared "archived.metadata.json" file). Introduced
-    /// so that NightFrontMetadataRecorder, and the calibration-consuming flat instructions, can all
+    /// Centralizes every read/modify/write of a NightFrontPlanMetadata file. Introduced so that
+    /// NightFrontMetadataRecorder, and the calibration-consuming flat instructions/conditions, can all
     /// safely interleave reads/writes within one running sequence instead of each holding its own
     /// private in-memory snapshot (the recorder used to build one NightFrontPlanMetadata once in its
     /// constructor and blindly overwrite the file from it on every write - a stale snapshot that would
     /// clobber any change made by another component in between).
     ///
+    /// There is a single, accumulating file per plan family - no separate archive. A completed
+    /// calibration requirement stays in the same CalibrationRequirements list with its
+    /// FlatsCompletedDate stamped; PeekNext/ClaimNext simply skip anything already completed (or
+    /// currently claimed by another in-flight flats instruction). PruneStaleCompleted is the only
+    /// thing that ever removes an entry, once it's been completed for longer than the configured
+    /// refresh window - at which point NightFrontMetadataRecorder will naturally re-add it as a fresh,
+    /// outstanding requirement the next time that filter/angle/gain/offset combination is seen.
+    ///
     /// A single process-wide lock guards every call into this class, rather than one lock per file
-    /// path. This is deliberate: the archive file is a single file shared across every live metadata
-    /// file's operations (per-BaseName live files, one shared archive), so a per-live-path lock would
-    /// not correctly serialize two different live files' operations that both touch that one shared
-    /// archive concurrently. Store operations are small, infrequent (JSON files of a handful of
-    /// entries, touched on rotation-complete events and loop-condition checks, not in a hot loop), so
-    /// giving up cross-file-name parallelism for correctness is the right trade here.
+    /// path. Store operations are small, infrequent (JSON files of a handful of entries, touched on
+    /// exposure-complete events and loop-condition checks, not in a hot loop), so a single lock is
+    /// simpler and the loss of cross-file-name parallelism doesn't matter in practice.
     /// </summary>
     public static class NightFrontMetadataStore {
         private const double DuplicateAngleToleranceDegrees = 1.0;
@@ -49,27 +53,27 @@ namespace JeffRidder.NINA.Nightfront.Import {
         }
 
         /// <summary>
-        /// Adds a calibration requirement iff no entry in EITHER the live or archived file already
-        /// covers (filter case-insensitive, rotation angle within 1 degree, exact gain, exact
-        /// offset). Returns whether it was added.
+        /// Adds a calibration requirement iff no entry already in the file covers (filter
+        /// case-insensitive, rotation angle within 1 degree, exact gain, exact offset) - completed
+        /// entries still count toward this check, since they aren't removed on completion. Returns
+        /// whether it was added.
         /// </summary>
-        public static bool TryAddCalibrationRequirement(string livePath, string archivedPath, string filter, double angle, int gain, int offset) {
+        public static bool TryAddCalibrationRequirement(string livePath, string filter, double angle, int gain, int offset) {
             lock (syncLock) {
                 var live = LoadUnlocked(livePath);
-                var archived = LoadUnlocked(archivedPath);
 
-                var alreadyCovered =
-                    live.CalibrationRequirements.Any(r => Matches(r, filter, angle, gain, offset)) ||
-                    archived.CalibrationRequirements.Any(r => Matches(r, filter, angle, gain, offset));
+                var alreadyCovered = live.CalibrationRequirements.Any(r => Matches(r, filter, angle, gain, offset));
                 if (alreadyCovered) {
                     return false;
                 }
 
                 live.CalibrationRequirements.Add(new NightFrontCalibrationRequirement {
+                    Id = Guid.NewGuid(),
                     Filter = filter,
                     RotationAngle = angle,
                     Gain = gain,
-                    Offset = offset
+                    Offset = offset,
+                    DateAdded = DateTime.Now
                 });
                 live.GeneratedAtUtc = DateTime.UtcNow;
                 SaveUnlocked(live, livePath);
@@ -110,66 +114,119 @@ namespace JeffRidder.NINA.Nightfront.Import {
         }
 
         /// <summary>
-        /// Atomically removes and returns the head calibration requirement, or null if none remain.
-        /// Two concurrent callers (e.g. two sequence branches sharing one metadata file) can never
-        /// both claim the same entry - the second caller sees it already gone and gets the next entry
-        /// (or null).
+        /// Atomically marks the next outstanding calibration requirement as claimed and returns it, or
+        /// null if none remain. Two concurrent callers (e.g. two sequence branches sharing one
+        /// metadata file) can never both claim the same entry - the second caller sees it already
+        /// claimed and gets the next one (or null). <paramref name="filterOrder"/> (may be null/empty)
+        /// ranks entries by filter name - see SelectNext.
         /// </summary>
-        public static NightFrontCalibrationRequirement ClaimNext(string livePath) {
+        public static NightFrontCalibrationRequirement ClaimNext(string livePath, IReadOnlyList<string> filterOrder) {
             lock (syncLock) {
                 var live = LoadUnlocked(livePath);
-                if (live.CalibrationRequirements.Count == 0) {
+                var next = SelectNext(live, filterOrder);
+                if (next == null) {
                     return null;
                 }
-                var claimed = live.CalibrationRequirements[0];
-                live.CalibrationRequirements.RemoveAt(0);
+                next.Claimed = true;
                 if (!SaveUnlocked(live, livePath)) {
-                    // If the removal didn't actually persist, the caller must not treat this as a
-                    // successful claim - returning `claimed` here would let it proceed to shoot a
-                    // flat while the entry silently reappears on the next read, reshooting forever.
+                    // If the claim didn't actually persist, the caller must not treat this as a
+                    // successful claim - returning `next` here would let it proceed to shoot a flat
+                    // while the claim silently reverts on the next read, reshooting forever.
                     throw new IOException($"Could not persist claiming the next calibration requirement to '{livePath}'.");
                 }
-                return claimed;
+                return next;
             }
         }
 
-        /// <summary>Read-only equivalent of ClaimNext - the current head entry, without removing it.</summary>
-        public static NightFrontCalibrationRequirement PeekNext(string livePath) {
+        /// <summary>Read-only equivalent of ClaimNext - the current next outstanding entry, without
+        /// claiming it.</summary>
+        public static NightFrontCalibrationRequirement PeekNext(string livePath, IReadOnlyList<string> filterOrder) {
             lock (syncLock) {
                 var live = LoadUnlocked(livePath);
-                return live.CalibrationRequirements.Count > 0 ? live.CalibrationRequirements[0] : null;
+                return SelectNext(live, filterOrder);
             }
         }
 
-        /// <summary>Success path for an entry previously returned by ClaimNext: appends it to the
-        /// archive file. The entry is already removed from the live file, so this never needs to
-        /// re-locate it there.</summary>
-        public static void ArchiveClaimed(string archivedPath, NightFrontCalibrationRequirement claimed) {
+        /// <summary>Success path for an entry previously returned by ClaimNext: stamps its
+        /// FlatsCompletedDate and clears Claimed. The entry stays in the file (no archive) so it
+        /// keeps blocking TryAddCalibrationRequirement from re-adding a duplicate until it's eventually
+        /// pruned by PruneStaleCompleted.</summary>
+        public static void MarkCompleted(string livePath, Guid requirementId) {
             lock (syncLock) {
-                var archived = LoadUnlocked(archivedPath);
-                archived.CalibrationRequirements.Add(claimed);
-                archived.GeneratedAtUtc = DateTime.UtcNow;
-                if (!SaveUnlocked(archived, archivedPath)) {
+                var live = LoadUnlocked(livePath);
+                var entry = live.CalibrationRequirements.FirstOrDefault(r => r.Id == requirementId);
+                if (entry == null) {
+                    return;
+                }
+                entry.FlatsCompletedDate = DateTime.Now;
+                entry.Claimed = false;
+                if (!SaveUnlocked(live, livePath)) {
                     // Throwing here (rather than swallowing) lets NightFrontFlatsInstructionBase's
-                    // catch block restore the claimed entry to the live file instead of losing it.
-                    throw new IOException($"Could not persist archiving the completed calibration requirement to '{archivedPath}'.");
+                    // catch block release the claim instead of leaving it stuck claimed forever.
+                    throw new IOException($"Could not persist completing the calibration requirement in '{livePath}'.");
                 }
             }
         }
 
-        /// <summary>Failure/cancellation path for an entry previously returned by ClaimNext:
-        /// re-inserts it at the head of the live file so a failed/cancelled flat run doesn't lose the
-        /// requirement.</summary>
-        public static void RestoreClaimed(string livePath, NightFrontCalibrationRequirement claimed) {
+        /// <summary>Failure/cancellation path for an entry previously returned by ClaimNext: clears
+        /// Claimed so it's eligible to be claimed again.</summary>
+        public static void ReleaseClaim(string livePath, Guid requirementId) {
             lock (syncLock) {
                 var live = LoadUnlocked(livePath);
-                live.CalibrationRequirements.Insert(0, claimed);
+                var entry = live.CalibrationRequirements.FirstOrDefault(r => r.Id == requirementId);
+                if (entry == null) {
+                    return;
+                }
+                entry.Claimed = false;
                 if (!SaveUnlocked(live, livePath)) {
                     // Nothing left to fall back to at this point - surface loudly rather than
-                    // silently losing the requirement.
-                    throw new IOException($"Could not persist restoring the calibration requirement to '{livePath}' after a failed/cancelled run.");
+                    // silently leaving the requirement claimed forever.
+                    throw new IOException($"Could not persist releasing the calibration requirement's claim in '{livePath}' after a failed/cancelled run.");
                 }
             }
+        }
+
+        /// <summary>Removes every calibration requirement that's been completed for longer than
+        /// <paramref name="refreshDays"/>. Entries that have never been completed are never touched by
+        /// this - they simply keep waiting. Best-effort, like the other write paths driven from an
+        /// event/run context with no caller able to act on a failure.</summary>
+        public static void PruneStaleCompleted(string livePath, int refreshDays) {
+            lock (syncLock) {
+                var live = LoadUnlocked(livePath);
+                var cutoff = DateTime.Now.AddDays(-refreshDays);
+                var removed = live.CalibrationRequirements.RemoveAll(r => r.FlatsCompletedDate != null && r.FlatsCompletedDate.Value < cutoff);
+                if (removed > 0) {
+                    live.GeneratedAtUtc = DateTime.UtcNow;
+                    SaveUnlocked(live, livePath);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Picks the next outstanding (not completed, not currently claimed) requirement: ranked by
+        /// its filter's position in <paramref name="filterOrder"/> (case-insensitive; a filter absent
+        /// from filterOrder ranks after every filter that is listed), then by original list order as a
+        /// stable tie-break (LINQ's OrderBy is stable, so this falls out of Where/OrderBy without an
+        /// explicit secondary sort). A null/empty filterOrder ranks every filter equally, so original
+        /// list order alone determines the result - i.e. today's FIFO behavior.
+        /// </summary>
+        private static NightFrontCalibrationRequirement SelectNext(NightFrontPlanMetadata live, IReadOnlyList<string> filterOrder) {
+            return live.CalibrationRequirements
+                .Where(r => r.FlatsCompletedDate == null && !r.Claimed)
+                .OrderBy(r => FilterRank(r.Filter, filterOrder))
+                .FirstOrDefault();
+        }
+
+        private static int FilterRank(string filter, IReadOnlyList<string> filterOrder) {
+            if (filterOrder == null || filterOrder.Count == 0) {
+                return 0;
+            }
+            for (var i = 0; i < filterOrder.Count; i++) {
+                if (string.Equals(filterOrder[i], filter, StringComparison.OrdinalIgnoreCase)) {
+                    return i;
+                }
+            }
+            return filterOrder.Count;
         }
 
         private static bool Matches(NightFrontCalibrationRequirement requirement, string filter, double angle, int gain, int offset) {
@@ -184,21 +241,34 @@ namespace JeffRidder.NINA.Nightfront.Import {
                 return new NightFrontPlanMetadata();
             }
 
+            NightFrontPlanMetadata metadata;
             try {
                 var json = File.ReadAllText(path);
-                return JsonConvert.DeserializeObject<NightFrontPlanMetadata>(json) ?? new NightFrontPlanMetadata();
+                metadata = JsonConvert.DeserializeObject<NightFrontPlanMetadata>(json) ?? new NightFrontPlanMetadata();
             } catch (Exception ex) {
                 Notification.ShowWarning($"NightFront: could not read calibration metadata file '{path}': {ex.Message}");
                 return new NightFrontPlanMetadata();
             }
+
+            // Entries written before Id existed come back as Guid.Empty - assign each a real one so
+            // ClaimNext/MarkCompleted/ReleaseClaim can address them individually. This becomes
+            // permanent the next time anything saves the file; a plain Load (no save) regenerating a
+            // fresh id on every call is harmless since nothing keys off a read-only id.
+            foreach (var requirement in metadata.CalibrationRequirements) {
+                if (requirement.Id == Guid.Empty) {
+                    requirement.Id = Guid.NewGuid();
+                }
+            }
+
+            return metadata;
         }
 
         /// <summary>Returns whether the write actually succeeded. Callers that need the file to
-        /// reflect a change for correctness (ClaimNext/ArchiveClaimed/RestoreClaimed) must check this
-        /// and not treat a failed write as a persisted one; callers invoked from an event-handler
-        /// context with no caller able to act on failure (RecordRunStarted/UpsertTargetMetadata/
-        /// RecordMeasuredRotationAngle/TryAddCalibrationRequirement) treat this as best-effort, same
-        /// as the warning notification already shown here.</summary>
+        /// reflect a change for correctness (ClaimNext/MarkCompleted/ReleaseClaim) must check this and
+        /// not treat a failed write as a persisted one; callers invoked from an event-handler context
+        /// with no caller able to act on failure (RecordRunStarted/UpsertTargetMetadata/
+        /// RecordMeasuredRotationAngle/TryAddCalibrationRequirement/PruneStaleCompleted) treat this as
+        /// best-effort, same as the warning notification already shown here.</summary>
         private static bool SaveUnlocked(NightFrontPlanMetadata metadata, string path) {
             try {
                 var tempPath = path + ".tmp";
