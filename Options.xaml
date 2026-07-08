@@ -20,7 +20,7 @@
                     Content="Browse..." />
             </StackPanel>
             <StackPanel Margin="0,5,0,0" Orientation="Horizontal">
-                <TextBlock VerticalAlignment="Center" Text="Flat Filter Order" />
+                <TextBlock VerticalAlignment="Center" Text='Flat Filter Order (e.g., &quot;L, B, G, R, OIII, Ha, SII&quot;)' />
                 <TextBox
                     MinWidth="250"
                     Margin="5,0,0,0"
