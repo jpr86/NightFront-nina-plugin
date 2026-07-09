@@ -1,3 +1,4 @@
+using JeffRidder.NINA.Nightfront.Import;
 using Newtonsoft.Json;
 using NINA.Core.Utility.Notification;
 using NINA.Sequencer.Conditions;
@@ -115,6 +116,54 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                     TargetSummaries.Add(item);
                 }
             }
+        }
+
+        /// <summary>
+        /// Builds a point-in-time snapshot of PlannedCount/CompletedCount/Status for every target row
+        /// in TargetSummaries (todos/nina-safety-delay-plan.md, Finding 7 / Phase 1) - the
+        /// already-live progress data a future safety-recovery replan step (Phase 3) can serialize
+        /// alongside a live weather reading and hand to a NightFront CLI remainder-of-night re-solve.
+        /// Reads TargetSummaries on the UI thread, same as RebuildTargetSummaries - the intended
+        /// caller (a future Phase 3 sequence instruction's Execute) runs off the UI thread like any
+        /// other NINA sequence item, and TargetSummaries is the same WPF-bound ObservableCollection
+        /// RebuildTargetSummariesOnCurrentThread mutates in place (Clear then re-Add), so an
+        /// unmarshaled read here could race a concurrent rebuild triggered by a manual sequencer edit.
+        /// A TargetSummaries entry that isn't a NightFrontTargetSummary - a raw top-level ISequenceItem,
+        /// or a target whose summary row failed to build (see RebuildTargetSummariesOnCurrentThread) -
+        /// still gets a row with null PlannedCount/CompletedCount rather than being omitted: a future
+        /// remainder-of-night re-solve needs to tell "this target has unknown progress" apart from
+        /// "this target was never part of tonight's plan," since the two would otherwise both simply
+        /// be absent from Targets.
+        /// </summary>
+        public NightFrontProgressSnapshot BuildProgressSnapshot() {
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher != null && !dispatcher.CheckAccess()) {
+                return dispatcher.Invoke(BuildProgressSnapshotOnCurrentThread);
+            }
+            return BuildProgressSnapshotOnCurrentThread();
+        }
+
+        private NightFrontProgressSnapshot BuildProgressSnapshotOnCurrentThread() {
+            var snapshot = new NightFrontProgressSnapshot();
+            foreach (var summary in TargetSummaries) {
+                switch (summary) {
+                    case NightFrontTargetSummary targetSummary:
+                        snapshot.Targets.Add(new NightFrontTargetProgress {
+                            Name = targetSummary.Name,
+                            PlannedCount = targetSummary.PlannedCount,
+                            CompletedCount = targetSummary.CompletedCount,
+                            Status = targetSummary.Status.ToString(),
+                        });
+                        break;
+                    case ISequenceItem item:
+                        snapshot.Targets.Add(new NightFrontTargetProgress {
+                            Name = item.Name,
+                            Status = item.Status.ToString(),
+                        });
+                        break;
+                }
+            }
+            return snapshot;
         }
 
         /// <summary>

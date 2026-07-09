@@ -1,7 +1,19 @@
 using JeffRidder.NINA.Nightfront.Sequencer;
 using Moq;
+using NINA.Astrometry;
+using NINA.Astrometry.Interfaces;
+using NINA.Core.Enum;
+using NINA.Core.Model;
+using NINA.Core.Model.Equipment;
+using NINA.Core.Utility;
+using NINA.Equipment.Interfaces;
+using NINA.Equipment.Interfaces.Mediator;
+using NINA.Profile.Interfaces;
+using NINA.Sequencer.Conditions;
 using NINA.Sequencer.Container;
 using NINA.Sequencer.SequenceItem;
+using NINA.WPF.Base.Interfaces.Mediator;
+using NINA.WPF.Base.Interfaces.ViewModel;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.Linq;
@@ -153,6 +165,112 @@ namespace JeffRidder.NINA.Nightfront.Tests {
             var mock = new Mock<ISequenceContainer>();
             mock.Setup(c => c.Items).Returns(new List<ISequenceItem>(items));
             return mock.Object;
+        }
+
+        [Fact]
+        public void BuildProgressSnapshot_MapsPlannedAndCompletedCountsFromEachTarget() {
+            var profileService = CreateProfileService();
+
+            // A target part-way through a 12-exposure filter loop.
+            var inProgress = CreateDeepSkyObjectContainer("M 63", profileService);
+            var loop = new SequentialContainer();
+            loop.Add(new LoopCondition { Iterations = 12, CompletedIterations = 5 });
+            inProgress.Add(loop);
+
+            // A target queued for tonight but not yet started - a real filter loop with 0 completed,
+            // not an empty container (which would test "has no plan" rather than "hasn't started").
+            var notStarted = CreateDeepSkyObjectContainer("LDN 43", profileService);
+            var queuedLoop = new SequentialContainer();
+            queuedLoop.Add(new LoopCondition { Iterations = 10, CompletedIterations = 0 });
+            notStarted.Add(queuedLoop);
+
+            var container = new NightFrontContainer();
+            container.PopulateItems(new ISequenceItem[] { inProgress, notStarted });
+
+            var snapshot = container.BuildProgressSnapshot();
+
+            Assert.Equal(2, snapshot.Targets.Count);
+            var m63 = snapshot.Targets.Single(t => t.Name == "M 63");
+            Assert.Equal(12, m63.PlannedCount);
+            Assert.Equal(5, m63.CompletedCount);
+            // Neither target's sequence actually executed here (CompletedIterations was set directly,
+            // not produced by running the sequence), so Status stays CREATED for both - it's tracked
+            // independently of the synthetic progress this test injects.
+            Assert.Equal("CREATED", m63.Status);
+            var ldn43 = snapshot.Targets.Single(t => t.Name == "LDN 43");
+            Assert.Equal(10, ldn43.PlannedCount);
+            Assert.Equal(0, ldn43.CompletedCount);
+            Assert.Equal("CREATED", ldn43.Status);
+        }
+
+        [Fact]
+        public void BuildProgressSnapshot_NonTargetTopLevelItem_GetsFallbackRowWithNullCounts() {
+            var profileService = CreateProfileService();
+            var target = CreateDeepSkyObjectContainer("M 63", profileService);
+            var rawItem = Mock.Of<ISequenceItem>(i => i.Name == "Some Raw Item" && i.Status == SequenceEntityStatus.CREATED);
+
+            var container = new NightFrontContainer();
+            container.PopulateItems(new[] { (ISequenceItem)target, rawItem });
+
+            var snapshot = container.BuildProgressSnapshot();
+
+            // The raw item still gets a row - its progress is unknown, but it's not silently absent
+            // from the snapshot (an absent row would be indistinguishable from "not part of tonight's
+            // plan at all").
+            Assert.Equal(2, snapshot.Targets.Count);
+            var fallbackRow = snapshot.Targets.Single(t => t.Name == "Some Raw Item");
+            Assert.Null(fallbackRow.PlannedCount);
+            Assert.Null(fallbackRow.CompletedCount);
+            Assert.Equal("CREATED", fallbackRow.Status);
+        }
+
+        [Fact]
+        public void BuildProgressSnapshot_EmptyContainer_ReturnsEmptyTargetsList() {
+            var container = new NightFrontContainer();
+
+            var snapshot = container.BuildProgressSnapshot();
+
+            Assert.Empty(snapshot.Targets);
+        }
+
+        /// <summary>
+        /// Builds a real DeepSkyObjectContainer with no Target set - NightFrontTargetSummary falls
+        /// back to the container's own Name in that case (see its constructor), so this avoids ever
+        /// touching InputCoordinates/DeepSkyObject.Coordinates, which transitively requires NINA
+        /// .Astrometry's native NOVAS31lib.dll (see the note atop NightFrontJsonImporterTests) - not
+        /// needed here since progress-snapshot mapping doesn't depend on a target's position.
+        /// </summary>
+        private static DeepSkyObjectContainer CreateDeepSkyObjectContainer(string name, IProfileService profileService) {
+            var dso = new DeepSkyObjectContainer(
+                profileService,
+                Mock.Of<INighttimeCalculator>(),
+                Mock.Of<IFramingAssistantVM>(),
+                Mock.Of<IApplicationMediator>(),
+                Mock.Of<IPlanetariumFactory>(),
+                Mock.Of<ICameraMediator>(),
+                Mock.Of<IFilterWheelMediator>());
+            dso.Name = name;
+            return dso;
+        }
+
+        private static IProfileService CreateProfileService() {
+            var filter = new FilterInfo("Ha", 0, 0);
+
+            var astrometrySettings = new Mock<IAstrometrySettings>();
+            astrometrySettings.SetupGet(x => x.Latitude).Returns(45.0);
+            astrometrySettings.SetupGet(x => x.Longitude).Returns(-93.0);
+            astrometrySettings.SetupGet(x => x.Horizon).Returns((CustomHorizon)null!);
+
+            var filterWheelSettings = new Mock<IFilterWheelSettings>();
+            filterWheelSettings.SetupGet(x => x.FilterWheelFilters).Returns(new ObserveAllCollection<FilterInfo>(new[] { filter }));
+
+            var profile = new Mock<IProfile>();
+            profile.SetupGet(x => x.AstrometrySettings).Returns(astrometrySettings.Object);
+            profile.SetupGet(x => x.FilterWheelSettings).Returns(filterWheelSettings.Object);
+
+            var profileService = new Mock<IProfileService>();
+            profileService.SetupGet(x => x.ActiveProfile).Returns(profile.Object);
+            return profileService.Object;
         }
     }
 }

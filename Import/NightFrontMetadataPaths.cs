@@ -5,22 +5,34 @@ using System.Linq;
 namespace JeffRidder.NINA.Nightfront.Import {
 
     /// <summary>
-    /// Locates today's NightFront plan file and derives/resolves the calibration-metadata file paths
-    /// associated with it. Metadata is no longer tied to a single night's dated plan filename (it
-    /// accumulates across nights - see NightFrontMetadataStore), so this is the one place that
-    /// translates "today's dated plan file" into "the accumulating metadata file for that plan
-    /// family," and the one place that lets calibration-consuming instructions/conditions find that
-    /// same file without the user re-typing its name everywhere.
+    /// Locates today's NightFront plan file and derives/resolves the calibration-metadata and
+    /// progress-snapshot sidecar file paths associated with it. Metadata is no longer tied to a
+    /// single night's dated plan filename (it accumulates across nights - see NightFrontMetadataStore),
+    /// so this is the one place that translates "today's dated plan file" into "the accumulating
+    /// metadata file for that plan family," and the one place that lets calibration-consuming
+    /// instructions/conditions find that same file without the user re-typing its name everywhere.
+    /// It's also the one place that knows about every kind of NightFront-written sidecar file, so
+    /// FindTodaysPlanFile can exclude all of them from its "what's the actual plan file" scan.
     /// </summary>
     public static class NightFrontMetadataPaths {
         private const string LiveMetadataSuffix = ".metadata.json";
         private const string ArchivedMetadataFileName = "archived.metadata.json";
         private const string ReservedArchiveBaseName = "archived";
 
+        /// <summary>Suffix for a NightFrontProgressSnapshot sidecar file (see
+        /// NightFrontProgressSnapshotWriter) - a second kind of NightFront-written sidecar that, like
+        /// the metadata file, must never be picked up by FindTodaysPlanFile as if it were an actual
+        /// plan file. Unlike the metadata file, a progress snapshot is expected to be named with
+        /// today's date (mirroring the plan file it was captured from), which is exactly the shape
+        /// FindTodaysPlanFile searches for - so it needs its own explicit exclusion here rather than
+        /// relying on IsMetadataFile's narrower check.</summary>
+        private const string ProgressSnapshotSuffix = ".progress.json";
+
         /// <summary>
         /// Finds the plan JSON file in <paramref name="folder"/> whose name contains today's date
-        /// (yyyy-MM-dd), excluding NightFront's own ".metadata.json"/"archived.metadata.json" sidecar
-        /// files. Returns null if the folder is unset/missing or no match is found.
+        /// (yyyy-MM-dd), excluding NightFront's own ".metadata.json"/"archived.metadata.json"/
+        /// ".progress.json" sidecar files. Returns null if the folder is unset/missing or no match is
+        /// found.
         /// </summary>
         public static string FindTodaysPlanFile(string folder, DateTime now) {
             if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder)) {
@@ -29,8 +41,18 @@ namespace JeffRidder.NINA.Nightfront.Import {
 
             var todayToken = now.ToString("yyyy-MM-dd");
             return Directory.EnumerateFiles(folder, "*.json")
-                .Where(f => !IsMetadataFile(f))
+                .Where(f => !IsMetadataFile(f) && !IsProgressSnapshotFile(f))
                 .FirstOrDefault(f => Path.GetFileName(f).Contains(todayToken));
+        }
+
+        /// <summary>Builds the progress-snapshot path for <paramref name="baseName"/> (typically the
+        /// same date-stamped base name as the plan file it was captured from - see
+        /// NightFrontJsonImporter/NightFrontUpdateInstruction). Intended as the one place a future
+        /// caller (Phase 3's NightFrontReplanInstruction - see todos/nina-safety-delay-plan.md) derives
+        /// where to write a NightFrontProgressSnapshot, rather than inventing an ad hoc path that
+        /// FindTodaysPlanFile's exclusion filter above wouldn't recognize.</summary>
+        public static string GetProgressSnapshotPath(string folder, string baseName) {
+            return Path.Combine(folder, baseName + ProgressSnapshotSuffix);
         }
 
         /// <summary>
@@ -126,6 +148,10 @@ namespace JeffRidder.NINA.Nightfront.Import {
 
         private static bool IsMetadataFile(string path) {
             return path.EndsWith(LiveMetadataSuffix, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsProgressSnapshotFile(string path) {
+            return path.EndsWith(ProgressSnapshotSuffix, StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>NightFront no longer writes this file itself - completed calibration requirements

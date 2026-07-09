@@ -94,6 +94,47 @@ namespace JeffRidder.NINA.Nightfront.Tests {
             }
         }
 
+        [Fact]
+        public void FindTodaysPlanFile_ExcludesProgressSnapshotFile_EvenWhenDateStampedLikeThePlan() {
+            var folder = CreateTempFolder();
+            try {
+                var today = new DateTime(2026, 7, 6);
+                // A progress snapshot named the same way NightFrontProgressSnapshotWriter's own
+                // caller is expected to name one - date-stamped like the plan file it was captured
+                // from (see GetProgressSnapshotPath) - must not be mistaken for the real plan file.
+                File.WriteAllText(Path.Combine(folder, "TargetsForTonight_2026-07-06.progress.json"), "{}");
+                File.WriteAllText(Path.Combine(folder, "TargetsForTonight_2026-07-06.json"), "{}");
+
+                var result = NightFrontMetadataPaths.FindTodaysPlanFile(folder, today);
+
+                Assert.Equal(Path.Combine(folder, "TargetsForTonight_2026-07-06.json"), result);
+            } finally {
+                Directory.Delete(folder, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void FindTodaysPlanFile_OnlyAProgressSnapshotPresent_ReturnsNull() {
+            var folder = CreateTempFolder();
+            try {
+                var today = new DateTime(2026, 7, 6);
+                File.WriteAllText(Path.Combine(folder, "TargetsForTonight_2026-07-06.progress.json"), "{}");
+
+                var result = NightFrontMetadataPaths.FindTodaysPlanFile(folder, today);
+
+                Assert.Null(result);
+            } finally {
+                Directory.Delete(folder, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void GetProgressSnapshotPath_CombinesFolderBaseNameAndSuffix() {
+            var result = NightFrontMetadataPaths.GetProgressSnapshotPath("C:\\NightFrontData", "TargetsForTonight_2026-07-06");
+
+            Assert.Equal(Path.Combine("C:\\NightFrontData", "TargetsForTonight_2026-07-06.progress.json"), result);
+        }
+
         private static string CreateTempFolder() {
             var folder = Path.Combine(Path.GetTempPath(), "NightFrontTests_" + Guid.NewGuid());
             Directory.CreateDirectory(folder);
