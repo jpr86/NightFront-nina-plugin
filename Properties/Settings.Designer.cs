@@ -82,5 +82,17 @@ namespace JeffRidder.NINA.Nightfront.Properties {
                 this["ReplanEffortLevel"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string NightFrontCliPath {
+            get {
+                return ((string)(this["NightFrontCliPath"]));
+            }
+            set {
+                this["NightFrontCliPath"] = value;
+            }
+        }
     }
 }

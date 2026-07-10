@@ -211,6 +211,34 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
             return null;
         }
 
+        /// <summary>
+        /// Finds a NightFrontContainer anywhere in the whole sequence tree containing
+        /// <paramref name="from"/>, by walking up to the ultimate root container and then searching
+        /// every descendant depth-first. Used by NightFrontReplanInstruction (todos/
+        /// nina-safety-delay-plan.md, Phase 3), which - unlike NightFrontUpdateInstruction - has no
+        /// fixed "runs before, in a later sibling" relationship to the container it needs to reach:
+        /// the maintainer's own production template places it inside "Once Safe," a sibling branch
+        /// of "Loop while safe" (where the real NightFrontContainer lives), not a preceding sibling
+        /// of it. FindNext's forward-from-a-specific-sibling search can only ever look inside the
+        /// subtree of siblings that come after a given item in one specific list, so it can't reach
+        /// across into a completely different branch of the tree the way this needs to - hence a
+        /// full search from the top instead of a positional one. Returns null if
+        /// <paramref name="from"/> has no parent (e.g. it IS the root, or isn't attached to a
+        /// sequence yet) or no NightFrontContainer exists anywhere in the tree.
+        /// </summary>
+        public static NightFrontContainer FindAnywhere(ISequenceItem from) {
+            ISequenceContainer root = from?.Parent;
+            if (root == null) {
+                return null;
+            }
+            while (root.Parent != null) {
+                root = root.Parent;
+            }
+
+            var visited = new HashSet<ISequenceContainer>(ReferenceEqualityComparer.Instance);
+            return FindInSubtree(root, visited);
+        }
+
         public override object Clone() {
             var clone = new NightFrontContainer(this);
             foreach (var item in Items) {

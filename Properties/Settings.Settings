@@ -17,5 +17,8 @@
     <Setting Name="ReplanEffortLevel" Type="System.String" Scope="User">
       <Value Profile="(Default)">Fast</Value>
     </Setting>
+    <Setting Name="NightFrontCliPath" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
   </Settings>
 </SettingsFile>

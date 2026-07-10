@@ -135,6 +135,53 @@ namespace JeffRidder.NINA.Nightfront.Tests {
             Assert.Equal(Path.Combine("C:\\NightFrontData", "TargetsForTonight_2026-07-06.progress.json"), result);
         }
 
+        [Fact]
+        public void GetSelectionPreferencePath_IsAFixedFileNameNotBaseNameKeyed() {
+            var result = NightFrontMetadataPaths.GetSelectionPreferencePath("C:\\NightFrontData");
+
+            Assert.Equal(Path.Combine("C:\\NightFrontData", "selection.json"), result);
+        }
+
+        [Fact]
+        public void GetSessionConfigPath_IsAFixedFileNameNotBaseNameKeyed() {
+            var result = NightFrontMetadataPaths.GetSessionConfigPath("C:\\NightFrontData");
+
+            Assert.Equal(Path.Combine("C:\\NightFrontData", "session-config.json"), result);
+        }
+
+        [Fact]
+        public void FindTodaysPlanFile_ExcludesTheSelectionPreferenceAndSessionConfigSidecars() {
+            var folder = CreateTempFolder();
+            try {
+                var today = new DateTime(2026, 7, 6);
+                File.WriteAllText(Path.Combine(folder, "selection.json"), "{}");
+                File.WriteAllText(Path.Combine(folder, "session-config.json"), "{}");
+                File.WriteAllText(Path.Combine(folder, "TargetsForTonight_2026-07-06.json"), "{}");
+
+                var result = NightFrontMetadataPaths.FindTodaysPlanFile(folder, today);
+
+                Assert.Equal(Path.Combine(folder, "TargetsForTonight_2026-07-06.json"), result);
+            } finally {
+                Directory.Delete(folder, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void FindTodaysPlanFile_OnlySidecarsPresent_ReturnsNull() {
+            var folder = CreateTempFolder();
+            try {
+                var today = new DateTime(2026, 7, 6);
+                File.WriteAllText(Path.Combine(folder, "selection.json"), "{}");
+                File.WriteAllText(Path.Combine(folder, "session-config.json"), "{}");
+
+                var result = NightFrontMetadataPaths.FindTodaysPlanFile(folder, today);
+
+                Assert.Null(result);
+            } finally {
+                Directory.Delete(folder, recursive: true);
+            }
+        }
+
         private static string CreateTempFolder() {
             var folder = Path.Combine(Path.GetTempPath(), "NightFrontTests_" + Guid.NewGuid());
             Directory.CreateDirectory(folder);

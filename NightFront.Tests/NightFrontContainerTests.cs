@@ -167,6 +167,79 @@ namespace JeffRidder.NINA.Nightfront.Tests {
             return mock.Object;
         }
 
+        // ── FindAnywhere ─────────────────────────────────────────────────────────────────────
+
+        [Fact]
+        public void FindAnywhere_ContainerInACompletelySeparateSiblingBranch_IsFound() {
+            // Mirrors the maintainer's real production template: the item calling FindAnywhere (a
+            // stand-in for NightFrontReplanInstruction) sits inside "Once Safe," a sibling branch of
+            // "Loop while safe" (where the real NightFrontContainer lives) - NOT a preceding sibling
+            // of the container the way NightFrontUpdateInstruction's FindNext requires. A forward
+            // sibling scan from "from"'s own position could never reach across into that other branch.
+            var container = new NightFrontContainer();
+            var loopWhileSafeMock = MockContainer(container);
+
+            var replanInstructionMock = new Mock<ISequenceItem>();
+            var onceSafeMock = MockContainer(replanInstructionMock.Object);
+
+            var rootMock = MockContainer(loopWhileSafeMock.Object, onceSafeMock.Object);
+            rootMock.Setup(c => c.Parent).Returns((ISequenceContainer)null);
+            loopWhileSafeMock.Setup(c => c.Parent).Returns(rootMock.Object);
+            onceSafeMock.Setup(c => c.Parent).Returns(rootMock.Object);
+            replanInstructionMock.Setup(i => i.Parent).Returns(onceSafeMock.Object);
+
+            var result = NightFrontContainer.FindAnywhere(replanInstructionMock.Object);
+
+            Assert.Same(container, result);
+        }
+
+        [Fact]
+        public void FindAnywhere_FromHasNoParent_ReturnsNull() {
+            // Either "from" IS the root, or isn't attached to a sequence at all - either way there's
+            // nothing to walk up to and nothing to search.
+            var from = new Mock<ISequenceItem>();
+            from.Setup(i => i.Parent).Returns((ISequenceContainer)null);
+
+            var result = NightFrontContainer.FindAnywhere(from.Object);
+
+            Assert.Null(result);
+        }
+
+        [Fact]
+        public void FindAnywhere_NoContainerAnywhereInTheTree_ReturnsNull() {
+            var fromMock = new Mock<ISequenceItem>();
+            var rootMock = MockContainer(Mock.Of<ISequenceItem>(), Mock.Of<ISequenceItem>());
+            rootMock.Setup(c => c.Parent).Returns((ISequenceContainer)null);
+            fromMock.Setup(i => i.Parent).Returns(rootMock.Object);
+
+            var result = NightFrontContainer.FindAnywhere(fromMock.Object);
+
+            Assert.Null(result);
+        }
+
+        [Fact]
+        public void FindAnywhere_CyclicContainerGraph_DoesNotStackOverflowAndReturnsNull() {
+            var mockA = new Mock<ISequenceContainer>();
+            var mockB = new Mock<ISequenceContainer>();
+            mockA.Setup(c => c.Items).Returns(new List<ISequenceItem> { mockB.Object });
+            mockB.Setup(c => c.Items).Returns(new List<ISequenceItem> { mockA.Object });
+
+            var fromMock = new Mock<ISequenceItem>();
+            var rootMock = MockContainer(mockA.Object);
+            rootMock.Setup(c => c.Parent).Returns((ISequenceContainer)null);
+            fromMock.Setup(i => i.Parent).Returns(rootMock.Object);
+
+            var result = NightFrontContainer.FindAnywhere(fromMock.Object);
+
+            Assert.Null(result);
+        }
+
+        private static Mock<ISequenceContainer> MockContainer(params ISequenceItem[] items) {
+            var mock = new Mock<ISequenceContainer>();
+            mock.Setup(c => c.Items).Returns(new List<ISequenceItem>(items));
+            return mock;
+        }
+
         [Fact]
         public void BuildProgressSnapshot_MapsPlannedAndCompletedCountsFromEachTarget() {
             var profileService = CreateProfileService();

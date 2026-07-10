@@ -74,15 +74,14 @@ namespace JeffRidder.NINA.Nightfront {
         }
 
         // GA compute-budget preset (Fast/Balanced/Thorough - matching NightFront's own EffortPreset,
-        // optimizer/EffortPreset.kt) for an unattended safety-recovery replan. Read by the future
+        // optimizer/EffortPreset.kt) for an unattended safety-recovery replan. Read by
         // NightFrontReplanInstruction (todos/nina-safety-delay-plan.md, Phase 3) and passed straight
         // through to the NightFront CLI as `replan --effort=<value>`. Defaults to Fast: most machines
         // NINA actually runs on overnight (a mini-PC or NUC bolted to the mount) are far less
         // powerful than whatever desktop the plan's config was tuned on, and a replan runs
         // unattended during a real weather interruption with no one watching a progress bar to
         // justify a slower solve. A user with a genuinely capable imaging PC can opt into Balanced
-        // or Thorough here. Nothing reads this setting yet - Phase 3 is what wires it up - but it's
-        // added now so the option exists ahead of that instruction, per explicit request.
+        // or Thorough here.
         public static readonly string[] ReplanEffortLevelOptions = { "Fast", "Balanced", "Thorough" };
 
         public string ReplanEffortLevel {
@@ -91,6 +90,26 @@ namespace JeffRidder.NINA.Nightfront {
             }
             set {
                 Settings.Default.ReplanEffortLevel = value;
+                CoreUtil.SaveSettings(Settings.Default);
+                RaisePropertyChanged();
+            }
+        }
+
+        // Path to whatever actually launches the NightFront CLI - e.g. a native NightFront-cli.exe
+        // if one is ever packaged, or (today, since no such packaging exists yet) a small wrapper
+        // batch/cmd script the user writes once that runs `java -jar <path-to-nightfront.jar> %*`.
+        // NightFrontReplanInstruction runs this with `replan <args...>` appended - see its own doc
+        // comment for the full argument list. This indirection (a configurable path, rather than
+        // NightFrontReplanInstruction hardcoding how to invoke a JVM app) is a deliberate, narrower
+        // stopgap: packaging a proper native CLI launcher alongside the existing GUI installer is a
+        // real, separate follow-up (see todos/nina-safety-delay-plan.md's Phase 3 status), not
+        // solved here.
+        public string NightFrontCliPath {
+            get {
+                return Settings.Default.NightFrontCliPath;
+            }
+            set {
+                Settings.Default.NightFrontCliPath = value;
                 CoreUtil.SaveSettings(Settings.Default);
                 RaisePropertyChanged();
             }
@@ -108,6 +127,21 @@ namespace JeffRidder.NINA.Nightfront {
             };
             if (dialog.ShowDialog() == true) {
                 NightFrontDataFolder = dialog.SelectedPath;
+            }
+        }
+
+        private ICommand selectNightFrontCliPathCommand;
+
+        public ICommand SelectNightFrontCliPathCommand => selectNightFrontCliPathCommand ??= new CommunityToolkit.Mvvm.Input.RelayCommand(SelectNightFrontCliPath);
+
+        private void SelectNightFrontCliPath() {
+            var dialog = new VistaOpenFileDialog {
+                Title = "Select the NightFront CLI executable (or a wrapper script that launches it)",
+                Filter = "Executable files (*.exe;*.bat;*.cmd)|*.exe;*.bat;*.cmd|All files (*.*)|*.*",
+                FileName = NightFrontCliPath
+            };
+            if (dialog.ShowDialog() == true) {
+                NightFrontCliPath = dialog.FileName;
             }
         }
 

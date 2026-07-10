@@ -28,6 +28,21 @@ namespace JeffRidder.NINA.Nightfront.Import {
         /// relying on IsMetadataFile's narrower check.</summary>
         private const string ProgressSnapshotSuffix = ".progress.json";
 
+        /// <summary>Fixed (undated) filename NightFrontApp's exporter writes the exported
+        /// ParetoEntry's (utilization, quality) coordinates to - one per export directory, shared
+        /// across every night in a multi-night export (see NightFrontApp's ScheduleScreen.kt/
+        /// SelectionPreference.kt), not per-plan-file like the progress snapshot. Consumed by
+        /// Phase 3's NightFrontReplanInstruction, which passes it through to `NightFront replan`'s
+        /// optional selection-preference argument.</summary>
+        private const string SelectionPreferenceFileName = "selection.json";
+
+        /// <summary>Fixed (undated) filename NightFrontApp's exporter writes its own input
+        /// SessionConfig JSON to alongside the exported plan(s) - the plugin has no other way to
+        /// learn where the config that produced tonight's plan lives, since it otherwise only ever
+        /// sees the already-transformed NINA sequence JSON. Required by Phase 3's
+        /// NightFrontReplanInstruction as `NightFront replan`'s first argument.</summary>
+        private const string SessionConfigFileName = "session-config.json";
+
         /// <summary>
         /// Finds the plan JSON file in <paramref name="folder"/> whose name contains today's date
         /// (yyyy-MM-dd), excluding NightFront's own ".metadata.json"/"archived.metadata.json"/
@@ -41,7 +56,7 @@ namespace JeffRidder.NINA.Nightfront.Import {
 
             var todayToken = now.ToString("yyyy-MM-dd");
             return Directory.EnumerateFiles(folder, "*.json")
-                .Where(f => !IsMetadataFile(f) && !IsProgressSnapshotFile(f))
+                .Where(f => !IsMetadataFile(f) && !IsProgressSnapshotFile(f) && !IsSelectionPreferenceFile(f) && !IsSessionConfigFile(f))
                 .FirstOrDefault(f => Path.GetFileName(f).Contains(todayToken));
         }
 
@@ -53,6 +68,20 @@ namespace JeffRidder.NINA.Nightfront.Import {
         /// FindTodaysPlanFile's exclusion filter above wouldn't recognize.</summary>
         public static string GetProgressSnapshotPath(string folder, string baseName) {
             return Path.Combine(folder, baseName + ProgressSnapshotSuffix);
+        }
+
+        /// <summary>Path to the shared, per-export selection-preference sidecar (see
+        /// SelectionPreferenceFileName) - not per-plan-file, so unlike GetProgressSnapshotPath this
+        /// takes no baseName.</summary>
+        public static string GetSelectionPreferencePath(string folder) {
+            return Path.Combine(folder, SelectionPreferenceFileName);
+        }
+
+        /// <summary>Path to the shared, per-export session-config sidecar (see
+        /// SessionConfigFileName) - NightFrontReplanInstruction's source for `NightFront replan`'s
+        /// required config-file argument.</summary>
+        public static string GetSessionConfigPath(string folder) {
+            return Path.Combine(folder, SessionConfigFileName);
         }
 
         /// <summary>
@@ -152,6 +181,14 @@ namespace JeffRidder.NINA.Nightfront.Import {
 
         private static bool IsProgressSnapshotFile(string path) {
             return path.EndsWith(ProgressSnapshotSuffix, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsSelectionPreferenceFile(string path) {
+            return string.Equals(Path.GetFileName(path), SelectionPreferenceFileName, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsSessionConfigFile(string path) {
+            return string.Equals(Path.GetFileName(path), SessionConfigFileName, StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>NightFront no longer writes this file itself - completed calibration requirements
