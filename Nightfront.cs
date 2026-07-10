@@ -73,6 +73,29 @@ namespace JeffRidder.NINA.Nightfront {
             }
         }
 
+        // GA compute-budget preset (Fast/Balanced/Thorough - matching NightFront's own EffortPreset,
+        // optimizer/EffortPreset.kt) for an unattended safety-recovery replan. Read by the future
+        // NightFrontReplanInstruction (todos/nina-safety-delay-plan.md, Phase 3) and passed straight
+        // through to the NightFront CLI as `replan --effort=<value>`. Defaults to Fast: most machines
+        // NINA actually runs on overnight (a mini-PC or NUC bolted to the mount) are far less
+        // powerful than whatever desktop the plan's config was tuned on, and a replan runs
+        // unattended during a real weather interruption with no one watching a progress bar to
+        // justify a slower solve. A user with a genuinely capable imaging PC can opt into Balanced
+        // or Thorough here. Nothing reads this setting yet - Phase 3 is what wires it up - but it's
+        // added now so the option exists ahead of that instruction, per explicit request.
+        public static readonly string[] ReplanEffortLevelOptions = { "Fast", "Balanced", "Thorough" };
+
+        public string ReplanEffortLevel {
+            get {
+                return Settings.Default.ReplanEffortLevel;
+            }
+            set {
+                Settings.Default.ReplanEffortLevel = value;
+                CoreUtil.SaveSettings(Settings.Default);
+                RaisePropertyChanged();
+            }
+        }
+
         private ICommand selectNightFrontDataFolderCommand;
 
         public ICommand SelectNightFrontDataFolderCommand => selectNightFrontDataFolderCommand ??= new CommunityToolkit.Mvvm.Input.RelayCommand(SelectNightFrontDataFolder);

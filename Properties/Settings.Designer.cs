@@ -70,5 +70,17 @@ namespace JeffRidder.NINA.Nightfront.Properties {
                 this["FlatRefreshDays"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("Fast")]
+        public string ReplanEffortLevel {
+            get {
+                return ((string)(this["ReplanEffortLevel"]));
+            }
+            set {
+                this["ReplanEffortLevel"] = value;
+            }
+        }
     }
 }

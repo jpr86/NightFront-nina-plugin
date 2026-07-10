@@ -35,6 +35,15 @@
                     ToolTip="Number of days after a calibration requirement's flats were completed before it's dropped so it can be reshot."
                     Text="{Binding FlatRefreshDays, UpdateSourceTrigger=PropertyChanged}" />
             </StackPanel>
+            <StackPanel Margin="0,5,0,0" Orientation="Horizontal">
+                <TextBlock VerticalAlignment="Center" Text="Replan Effort Level" />
+                <ComboBox
+                    MinWidth="120"
+                    Margin="5,0,0,0"
+                    ToolTip="GA compute budget for an unattended safety-recovery replan. Defaults to Fast since most imaging PCs run overnight on modest hardware (a mini-PC or NUC on the mount) - only pick Balanced/Thorough if this machine is a genuinely capable desktop."
+                    ItemsSource="{Binding ReplanEffortLevelOptions}"
+                    SelectedItem="{Binding ReplanEffortLevel, Mode=TwoWay}" />
+            </StackPanel>
         </StackPanel>
     </DataTemplate>
 </ResourceDictionary>

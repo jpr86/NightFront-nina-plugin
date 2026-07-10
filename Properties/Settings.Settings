@@ -14,5 +14,8 @@
     <Setting Name="FlatRefreshDays" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">30</Value>
     </Setting>
+    <Setting Name="ReplanEffortLevel" Type="System.String" Scope="User">
+      <Value Profile="(Default)">Fast</Value>
+    </Setting>
   </Settings>
 </SettingsFile>
