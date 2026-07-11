@@ -117,6 +117,21 @@ namespace JeffRidder.NINA.Nightfront {
             }
         }
 
+        // Global data source for the Seeing Trigger's periodic FWHM sampling - typically a
+        // telemetry page hosting an Alcor seeing-monitor "Current Condition" image, e.g.
+        // hcronewmexico.com/telemetry/. A per-trigger DataSourceUrlOverride can override this for
+        // a specific trigger instance without touching the shared default.
+        public string SeeingDataSourceUrl {
+            get {
+                return Settings.Default.SeeingDataSourceUrl;
+            }
+            set {
+                Settings.Default.SeeingDataSourceUrl = value;
+                CoreUtil.SaveSettings(Settings.Default);
+                RaisePropertyChanged();
+            }
+        }
+
         private ICommand selectNightFrontDataFolderCommand;
 
         public ICommand SelectNightFrontDataFolderCommand => selectNightFrontDataFolderCommand ??= new CommunityToolkit.Mvvm.Input.RelayCommand(SelectNightFrontDataFolder);

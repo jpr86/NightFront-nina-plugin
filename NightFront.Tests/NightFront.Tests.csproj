@@ -19,4 +19,12 @@
   <ItemGroup>
     <ProjectReference Include="..\NightFront.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- ProjectReference doesn't propagate NightFront.csproj's own <None>/content items (only
+         PackageReferences flow transitively), so SeeingSamplerTests needs its own link to the
+         shared tessdata file to actually run OCR at test time. -->
+    <None Include="..\tessdata\eng.traineddata" Link="tessdata\eng.traineddata" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures\*.jpg" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

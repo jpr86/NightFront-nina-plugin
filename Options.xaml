@@ -36,6 +36,14 @@
                     Text="{Binding FlatRefreshDays, UpdateSourceTrigger=PropertyChanged}" />
             </StackPanel>
             <StackPanel Margin="0,5,0,0" Orientation="Horizontal">
+                <TextBlock VerticalAlignment="Center" Text="Seeing Data Source URL" />
+                <TextBox
+                    MinWidth="250"
+                    Margin="5,0,0,0"
+                    ToolTip="Telemetry page (or direct image URL) the Seeing Trigger samples for a &quot;Current Condition&quot; FWHM reading, e.g. an Alcor seeing-monitor page. Individual triggers can override this."
+                    Text="{Binding SeeingDataSourceUrl, UpdateSourceTrigger=PropertyChanged}" />
+            </StackPanel>
+            <StackPanel Margin="0,5,0,0" Orientation="Horizontal">
                 <TextBlock VerticalAlignment="Center" Text="Replan Effort Level" />
                 <ComboBox
                     MinWidth="120"

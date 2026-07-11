@@ -20,5 +20,8 @@
     <Setting Name="NightFrontCliPath" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
+    <Setting Name="SeeingDataSourceUrl" Type="System.String" Scope="User">
+      <Value Profile="(Default)">https://hcronewmexico.com/telemetry/</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

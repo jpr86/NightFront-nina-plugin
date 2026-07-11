@@ -27,9 +27,19 @@
          ISequenceItem), breaking casts across the plugin/host boundary - keep it compile-time-only. -->
     <PackageReference Include="NINA.Plugin" Version="3.0.0.2017-beta" ExcludeAssets="runtime;native" />
     <PackageReference Include="Ookii.Dialogs.Wpf" Version="5.0.1" />
+    <!-- OCR engine for NightFrontSeeingTrigger/SeeingSampler - reads the small, high-contrast
+         rendered-text seeing-monitor images (not photos), see SeeingSampler's doc comment. -->
+    <PackageReference Include="Tesseract" Version="5.2.0" />
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Resources\NightFrontIcon.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Committed rather than downloaded at first run - a plugin shouldn't pull a 4MB file from
+         GitHub on first use at an observatory site with limited connectivity beyond the
+         seeing-monitor host itself. Resolved at runtime via SeeingSampler's caller
+         (NightFrontSeeingTrigger.ResolveTessdataDir), co-located with the plugin's own assembly. -->
+    <None Include="tessdata\eng.traineddata" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <Compile Update="Properties\Settings.Designer.cs">

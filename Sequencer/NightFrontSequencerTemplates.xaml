@@ -6,7 +6,9 @@
     xmlns:local="clr-namespace:JeffRidder.NINA.Nightfront.Sequencer"
     xmlns:mini="clr-namespace:NINA.View.Sequencer.MiniSequencer;assembly=NINA.Sequencer"
     xmlns:nina="clr-namespace:NINA.View.Sequencer;assembly=NINA.Sequencer"
-    xmlns:ninactrl="clr-namespace:NINA.CustomControlLibrary;assembly=NINA.CustomControlLibrary">
+    xmlns:ninactrl="clr-namespace:NINA.CustomControlLibrary;assembly=NINA.CustomControlLibrary"
+    xmlns:behaviors="clr-namespace:NINA.Sequencer.Behaviors;assembly=NINA.Sequencer"
+    xmlns:i="http://schemas.microsoft.com/xaml/behaviors">
     <conv:NightFrontRunStatusToBrushConverter x:Key="NightFrontRunStatusToBrushConverter" />
     <conv:SequenceEntityStatusToBrushConverter x:Key="SequenceEntityStatusToBrushConverter" />
     <conv:InputCoordinatesToRaDecTextConverter x:Key="InputCoordinatesToRaDecTextConverter" />
@@ -324,5 +326,88 @@
                 <TextBlock VerticalAlignment="Center" Text="While Calibration Remains" />
             </mini:MiniCondition.ConditionProgressContent>
         </mini:MiniCondition>
+    </DataTemplate>
+
+    <!--  Seeing Trigger: threshold/comparator/interval fields, a live FWHM/status readout, and a
+          TriggerRunner drop area for the user's own action instructions. The drop area's
+          DragOverBehavior/DropIntoBehavior wiring is adapted from palmito9/Nina.SequencerPlus's
+          DIYMeridianFlipTrigger (a real, published plugin confirmed to target the same
+          NINA.Plugin 3.2.0.9001 this was verified against) - upstream NINA's own CustomTrigger
+          mechanism isn't available in any NINA version this plugin targets or that's deployed.
+          TriggerRunner is a plain SequentialContainer, which already implements IDropContainer, so
+          DropIntoCommand below needs no code in NightFrontSeeingTrigger itself.  -->
+    <DataTemplate DataType="{x:Type local:NightFrontSeeingTrigger}">
+        <nina:SequenceBlockView>
+            <nina:SequenceBlockView.SequenceItemContent>
+                <StackPanel Orientation="Vertical">
+                    <WrapPanel Orientation="Horizontal">
+                        <TextBlock Margin="0,0,5,0" VerticalAlignment="Center" Text="Fire when FWHM" />
+                        <ComboBox
+                            MinWidth="60"
+                            Margin="0,0,5,0"
+                            VerticalAlignment="Center"
+                            SelectedValue="{Binding Comparator}"
+                            SelectedValuePath="Tag">
+                            <ComboBoxItem Content="&lt;=" Tag="{x:Static local:SeeingComparator.LessThanOrEqual}" />
+                            <ComboBoxItem Content="&gt;=" Tag="{x:Static local:SeeingComparator.GreaterThanOrEqual}" />
+                        </ComboBox>
+                        <ninactrl:UnitTextBox
+                            MinWidth="50"
+                            Margin="0,0,5,0"
+                            VerticalAlignment="Center"
+                            ninactrl:UnitTextBox.Unit="&quot;"
+                            Text="{Binding ThresholdArcsec}"
+                            TextAlignment="Right" />
+                        <TextBlock Margin="10,0,5,0" VerticalAlignment="Center" Text="Poll every" />
+                        <ninactrl:UnitTextBox
+                            MinWidth="40"
+                            Margin="0,0,5,0"
+                            VerticalAlignment="Center"
+                            ninactrl:UnitTextBox.Unit="min"
+                            Text="{Binding PollingIntervalMinutes}"
+                            TextAlignment="Right" />
+                    </WrapPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Margin="0,0,5,0" VerticalAlignment="Center" Text="Data source override (blank = plugin default)" />
+                        <TextBox
+                            MinWidth="200"
+                            Margin="0,0,0,0"
+                            VerticalAlignment="Center"
+                            Text="{Binding DataSourceUrlOverride, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                    <TextBlock
+                        Margin="0,4,0,0"
+                        FontStyle="Italic"
+                        Opacity="0.85"
+                        Text="{Binding StatusMessage}" />
+                    <Border
+                        MinHeight="35"
+                        Margin="0,6,0,0"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1">
+                        <Grid Background="{StaticResource BackgroundBrush}" DataContext="{Binding TriggerRunner}">
+                            <ItemsControl MinHeight="35" ItemsSource="{Binding Items}" />
+                            <TextBlock
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                FontStyle="Italic"
+                                Opacity="0.4"
+                                Text="Instructions will go here..."
+                                Visibility="{Binding Items.Count, Converter={StaticResource InverseZeroToVisibilityConverter}}" />
+                            <i:Interaction.Behaviors>
+                                <behaviors:DragOverBehavior DragAboveSize="0" DragBelowSize="0" />
+                                <behaviors:DropIntoBehavior
+                                    AllowedDragDropTypesString="NINA.Sequencer.Container.ISequenceContainer;NINA.Sequencer.SequenceItem.ISequenceItem;NINA.Sequencer.TemplatedSequenceContainer"
+                                    OnDropCommand="DropIntoCommand" />
+                            </i:Interaction.Behaviors>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </nina:SequenceBlockView.SequenceItemContent>
+        </nina:SequenceBlockView>
+    </DataTemplate>
+
+    <DataTemplate x:Key="JeffRidder.NINA.Nightfront.Sequencer.NightFrontSeeingTrigger_Mini">
+        <mini:MiniTrigger />
     </DataTemplate>
 </ResourceDictionary>

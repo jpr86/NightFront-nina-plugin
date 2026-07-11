@@ -94,5 +94,17 @@ namespace JeffRidder.NINA.Nightfront.Properties {
                 this["NightFrontCliPath"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("https://hcronewmexico.com/telemetry/")]
+        public string SeeingDataSourceUrl {
+            get {
+                return ((string)(this["SeeingDataSourceUrl"]));
+            }
+            set {
+                this["SeeingDataSourceUrl"] = value;
+            }
+        }
     }
 }
