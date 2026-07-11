@@ -48,13 +48,22 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
     ///    the configured NightFront data folder, then spawns the NightFront CLI (Settings.Default.
     ///    NightFrontCliPath) as `replan --effort=&lt;ReplanEffortLevel&gt; &lt;session-config.json&gt;
     ///    &lt;progress-snapshot&gt; &lt;weather-override|none&gt; &lt;output-plan&gt;
-    ///    [selection-preference.json]` - see BuildReplanArguments.
+    ///    [selection-preference.json]` - see BuildReplanArguments. The `&lt;output-plan&gt;` path
+    ///    passed to the CLI is a fresh, GUID-suffixed temp path, deliberately NOT the same file
+    ///    NightFrontUpdateInstruction would look for - that file routinely already exists on disk
+    ///    (tonight's already-imported plan), so its mere presence after the CLI runs couldn't
+    ///    distinguish "the CLI wrote a fresh plan" from "the CLI wrote nothing and this is what was
+    ///    already there."
     /// 4. Waits (bounded by ReplanTimeoutSeconds) for the process to exit and write the output plan.
     /// 5. Calls the existing NightFrontContainer.PopulateItems to fully repopulate the container
     ///    with the fresh plan - safe here specifically because nothing in "Loop while safe" is
-    ///    executing at this point (Finding 3/6). If the CLI exits successfully but writes no output
-    ///    file - NightFront's own replan mode does exactly this when every target is already fully
-    ///    imaged, see Main.kt's runReplan - the container is instead emptied (not left with its old,
+    ///    executing at this point (Finding 3/6) - then File.Move()s the temp path over the real,
+    ///    date-stamped plan file so later discovery (a second interruption re-running
+    ///    FindTodaysPlanFile, or NightFrontUpdateInstruction itself) sees the freshest plan too; this
+    ///    also makes that on-disk update atomic (never a partial write in place, unlike overwriting
+    ///    the canonical file directly). If the CLI exits successfully but writes no temp file -
+    ///    NightFront's own replan mode does exactly this when every target is already fully imaged,
+    ///    see Main.kt's runReplan - the container is instead emptied (not left with its old,
     ///    already-completed contents), so "Loop while safe" restarting from the top doesn't re-shoot
     ///    a night that's actually finished.
     ///
@@ -248,23 +257,33 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                 var selectionPath = NightFrontMetadataPaths.GetSelectionPreferencePath(folder);
                 var selectionArg = File.Exists(selectionPath) ? selectionPath : null;
 
-                // Overwrite the same file NightFrontUpdateInstruction itself would look for, rather
-                // than writing a parallel filename - a later import (or a second interruption later
-                // the same night, whose own FindTodaysPlanFile re-discovery would otherwise find a
-                // stale original) should always see the freshest plan.
-                var outputPath = matchedFile ?? Path.Combine(folder, $"TargetsForTonight_{todayToken}.json");
+                // The eventual canonical plan file - the same one NightFrontUpdateInstruction itself
+                // would look for - but NOT what the CLI is told to write to directly (see cliOutputPath
+                // below): this path routinely already exists on disk (it's tonight's already-imported
+                // plan), so its mere existence after the CLI runs can't distinguish "the CLI wrote a
+                // fresh plan" from "the CLI wrote nothing and this is what was already here."
+                var finalOutputPath = matchedFile ?? Path.Combine(folder, $"TargetsForTonight_{todayToken}.json");
+
+                // A GUID-suffixed path that could not possibly have existed before this specific
+                // invocation - the CLI writes here, so its existence afterward is an unambiguous
+                // "the CLI wrote a fresh plan" signal, unlike finalOutputPath's. This also gives the
+                // canonical file an atomic update: it's only ever replaced via File.Move below, never
+                // partially written in place, so a kill/crash mid-write (e.g. this instruction's own
+                // timeout) can't leave a corrupted TargetsForTonight_<date>.json behind.
+                var cliOutputPath = BuildCliOutputPath(folder, finalOutputPath);
 
                 var arguments = BuildReplanArguments(
-                    Settings.Default.ReplanEffortLevel, configPath, progressPath, weatherArg, outputPath, selectionArg);
+                    Settings.Default.ReplanEffortLevel, configPath, progressPath, weatherArg, cliOutputPath, selectionArg);
 
                 progress?.Report(new ApplicationStatus { Status = "NightFront: replanning the remainder of the night" });
-                var (exitCode, stdErr) = await RunNightFrontCli(Settings.Default.NightFrontCliPath, arguments, token);
+                var (exitCode, stdOut, stdErr) = await RunNightFrontCli(Settings.Default.NightFrontCliPath, arguments, token);
 
                 if (exitCode != 0) {
-                    throw new NightFrontImportException($"NightFront replan failed (exit code {exitCode}): {stdErr}");
+                    var output = string.IsNullOrWhiteSpace(stdErr) ? stdOut : stdErr;
+                    throw new NightFrontImportException($"NightFront replan failed (exit code {exitCode}): {output}");
                 }
 
-                if (!File.Exists(outputPath)) {
+                if (!File.Exists(cliOutputPath)) {
                     // NightFront's own replan mode exits 0 with no output file precisely when every
                     // target is already fully imaged (see Main.kt's runReplan) - not a failure, but
                     // the container must be emptied rather than left with its old contents, or
@@ -277,11 +296,21 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                     return;
                 }
 
-                progress?.Report(new ApplicationStatus { Status = $"NightFront: importing replanned {Path.GetFileName(outputPath)}" });
-                var json = await File.ReadAllTextAsync(outputPath, token);
+                progress?.Report(new ApplicationStatus { Status = $"NightFront: importing replanned {Path.GetFileName(finalOutputPath)}" });
+                var json = await File.ReadAllTextAsync(cliOutputPath, token);
                 var imported = importer.Import(json);
 
                 container.PopulateItems(imported);
+
+                try {
+                    File.Move(cliOutputPath, finalOutputPath, overwrite: true);
+                } catch (Exception ex) {
+                    // Best-effort - the container is already correctly populated in memory regardless
+                    // of whether the on-disk canonical copy could be updated. Leave the temp file in
+                    // place rather than deleting it, so the fresh plan isn't lost outright if a later
+                    // interruption tonight needs to re-discover it.
+                    Notification.ShowWarning($"NightFront: replanned successfully but could not update the on-disk plan file: {ex.Message}");
+                }
 
                 LastRunSucceeded = true;
                 StatusMessage = $"Replanned at {now:HH:mm} ({imported.Count} target(s))";
@@ -325,6 +354,20 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
         }
 
         /// <summary>
+        /// A fresh path, in the same folder as <paramref name="finalOutputPath"/> and derived from
+        /// its base name (for a readable filename only - the GUID suffix is what actually guarantees
+        /// freshness), that could not possibly already exist on disk. Used as the path the NightFront
+        /// CLI is told to write its replanned plan to, specifically so its existence afterward is an
+        /// unambiguous "the CLI wrote something new" signal - unlike checking <paramref
+        /// name="finalOutputPath"/> itself, which is deliberately the same file NightFrontUpdateInstruction
+        /// would look for and so routinely already exists on disk before the CLI ever runs. Kept as a
+        /// small, pure, independently testable function alongside BuildReplanArguments.
+        /// </summary>
+        internal static string BuildCliOutputPath(string folder, string finalOutputPath) {
+            return Path.Combine(folder, $"{Path.GetFileNameWithoutExtension(finalOutputPath)}.{Guid.NewGuid():N}.replan-tmp.json");
+        }
+
+        /// <summary>
         /// Builds the full `replan` argument list NightFront's own Main.kt expects (see its
         /// REPLAN_USAGE constant: `replan [--effort=...] &lt;config&gt; &lt;progress&gt;
         /// &lt;weather|none&gt; &lt;output&gt; [selection]`) - kept as a small, pure, independently
@@ -351,11 +394,20 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
         /// <summary>
         /// Spawns <paramref name="cliPath"/> with <paramref name="arguments"/>, waits up to
         /// ReplanTimeoutSeconds (or until <paramref name="token"/> is cancelled) for it to exit, and
-        /// returns its exit code plus captured stderr. A timeout (as opposed to a real cancellation)
-        /// kills the process tree and throws, since letting an unbounded subprocess linger would
-        /// block sequence recovery indefinitely on a hung solve.
+        /// returns its exit code plus captured stdout/stderr. A timeout (as opposed to a real
+        /// cancellation) kills the process tree and throws, since letting an unbounded subprocess
+        /// linger would block sequence recovery indefinitely on a hung solve.
+        ///
+        /// Both redirected streams are drained concurrently via their own ReadToEndAsync tasks,
+        /// started immediately after Start() and awaited only after the process exits - reading only
+        /// one of two redirected streams is a classic deadlock: if the child fills the OS pipe buffer
+        /// on the un-drained stream, it blocks on that write, and WaitForExitAsync below then never
+        /// completes because the child can never exit while blocked. Log output is minimal today
+        /// (this repo ships no log4j2 config, so Log4j2's DefaultConfiguration suppresses routine
+        /// INFO/WARN output at its default ERROR level), but that's exactly the kind of environment
+        /// detail that shouldn't be relied on for correctness.
         /// </summary>
-        private static async Task<(int ExitCode, string StdErr)> RunNightFrontCli(string cliPath, List<string> arguments, CancellationToken token) {
+        private static async Task<(int ExitCode, string StdOut, string StdErr)> RunNightFrontCli(string cliPath, List<string> arguments, CancellationToken token) {
             var psi = new ProcessStartInfo {
                 FileName = cliPath,
                 UseShellExecute = false,
@@ -369,6 +421,7 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
 
             using var process = new Process { StartInfo = psi };
             process.Start();
+            var stdOutTask = process.StandardOutput.ReadToEndAsync();
             var stdErrTask = process.StandardError.ReadToEndAsync();
 
             using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(ReplanTimeoutSeconds));
@@ -383,8 +436,9 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                 throw new NightFrontImportException($"NightFront replan timed out after {ReplanTimeoutSeconds}s.");
             }
 
+            var stdOut = await stdOutTask;
             var stdErr = await stdErrTask;
-            return (process.ExitCode, stdErr);
+            return (process.ExitCode, stdOut, stdErr);
         }
 
         private static void TryKill(Process process) {

@@ -1,10 +1,50 @@
 using JeffRidder.NINA.Nightfront.Sequencer;
+using System.IO;
 using System.Linq;
 using Xunit;
 
 namespace JeffRidder.NINA.Nightfront.Tests {
 
     public class NightFrontReplanInstructionTests {
+
+        // ── BuildCliOutputPath ────────────────────────────────────────────────────────────────
+
+        [Fact]
+        public void BuildCliOutputPath_IsInTheSameFolderAsTheFinalOutputPath() {
+            var result = NightFrontReplanInstruction.BuildCliOutputPath(@"C:\NightFrontData", @"C:\NightFrontData\TargetsForTonight_2026-07-06.json");
+
+            Assert.Equal(@"C:\NightFrontData", Path.GetDirectoryName(result));
+        }
+
+        [Fact]
+        public void BuildCliOutputPath_NeverEqualsTheFinalOutputPath() {
+            // The whole point: finalOutputPath routinely already exists on disk (it's tonight's
+            // already-imported plan) - the CLI must never be told to write to that same path, or a
+            // later File.Exists(cliOutputPath) check can't distinguish "the CLI wrote something new"
+            // from "this file was already there before the CLI ran."
+            var finalOutputPath = @"C:\NightFrontData\TargetsForTonight_2026-07-06.json";
+
+            var result = NightFrontReplanInstruction.BuildCliOutputPath(@"C:\NightFrontData", finalOutputPath);
+
+            Assert.NotEqual(finalOutputPath, result);
+        }
+
+        [Fact]
+        public void BuildCliOutputPath_TwoCallsForTheSameFinalOutputPathNeverCollide() {
+            var finalOutputPath = @"C:\NightFrontData\TargetsForTonight_2026-07-06.json";
+
+            var first = NightFrontReplanInstruction.BuildCliOutputPath(@"C:\NightFrontData", finalOutputPath);
+            var second = NightFrontReplanInstruction.BuildCliOutputPath(@"C:\NightFrontData", finalOutputPath);
+
+            Assert.NotEqual(first, second);
+        }
+
+        [Fact]
+        public void BuildCliOutputPath_IncludesTheFinalOutputPathsBaseNameForReadability() {
+            var result = NightFrontReplanInstruction.BuildCliOutputPath(@"C:\NightFrontData", @"C:\NightFrontData\TargetsForTonight_2026-07-06.json");
+
+            Assert.StartsWith("TargetsForTonight_2026-07-06.", Path.GetFileName(result));
+        }
 
         [Fact]
         public void BuildReplanArguments_NoSelectionFile_OmitsTheOptionalTrailingArgument() {
