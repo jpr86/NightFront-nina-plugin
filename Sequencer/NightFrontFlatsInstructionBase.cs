@@ -39,11 +39,13 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
     [JsonObject(MemberSerialization.OptIn)]
     public abstract class NightFrontFlatsInstructionBase : SequentialContainer, IImmutableContainer, IValidatable {
         private readonly IProfileService profileService;
+        private readonly IRotatorMediator rotatorMediator;
         protected readonly MoveRotatorMechanical rotateItem;
         protected readonly SequenceItem flatItem;
 
         protected NightFrontFlatsInstructionBase(IProfileService profileService, IRotatorMediator rotatorMediator, SequenceItem flatItem) : base() {
             this.profileService = profileService;
+            this.rotatorMediator = rotatorMediator;
             rotateItem = new MoveRotatorMechanical(rotatorMediator);
             this.flatItem = flatItem;
             Add(rotateItem);
@@ -96,7 +98,25 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
             var livePath = NightFrontMetadataPaths.GetLiveMetadataPath(folder, resolvedBaseName);
             var filterOrder = NightFrontFilterOrder.Parse(Settings.Default.FlatFilterOrder);
 
-            var claimed = NightFrontMetadataStore.ClaimNext(livePath, filterOrder)
+            // Prefer whatever's still outstanding at the rotator's current physical angle over the
+            // globally-next-best-by-filterOrder entry (which could sit at a different angle entirely -
+            // see NightFrontWhileSameRotationCondition's doc comment for the real bug this fixes: a
+            // higher-ranked filter at a different angle would otherwise jump the queue ahead of a
+            // lower-ranked filter genuinely sitting at the angle already rotated to, leaving that
+            // lower-ranked filter's flats never shot). Falls back to the unscoped, globally-next-best
+            // claim - today's only behavior - when the rotator's position can't be read, or when
+            // nothing remains at the current angle at all (this instruction used standalone without a
+            // preceding rotate-to-next-angle step, or a same-rotation loop that's genuinely exhausted
+            // the current angle and needs to move on).
+            double? currentAngle = null;
+            try {
+                currentAngle = rotatorMediator?.GetInfo()?.MechanicalPosition;
+            } catch (Exception) {
+                // Best-effort - fall through to the unscoped claim below.
+            }
+
+            var claimed = (currentAngle.HasValue ? NightFrontMetadataStore.ClaimNext(livePath, filterOrder, currentAngle) : null)
+                ?? NightFrontMetadataStore.ClaimNext(livePath, filterOrder)
                 ?? throw new InvalidOperationException("No calibration requirements remain in the NightFront calibration-metadata file.");
 
             try {

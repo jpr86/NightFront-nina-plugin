@@ -298,5 +298,144 @@ namespace JeffRidder.NINA.Nightfront.Tests {
                 File.Delete(path);
             }
         }
+
+        // ── scopedToAngleDegrees ────────────────────────────────────────────────────────────────
+
+        [Fact]
+        public void PeekNext_ScopedToAngle_IgnoresOutstandingEntriesAtOtherAngles() {
+            var path = CreateTempPath();
+            try {
+                NightFrontMetadataStore.TryAddCalibrationRequirement(path, "Ha", 90.0, -1, -1);
+                NightFrontMetadataStore.TryAddCalibrationRequirement(path, "L", 180.0, -1, -1);
+
+                var scoped = NightFrontMetadataStore.PeekNext(path, NoFilterOrder, scopedToAngleDegrees: 90.0);
+
+                Assert.Equal("Ha", scoped.Filter);
+            } finally {
+                File.Delete(path);
+            }
+        }
+
+        [Fact]
+        public void PeekNext_ScopedToAngle_ReturnsNull_WhenNothingOutstandingAtThatAngle() {
+            var path = CreateTempPath();
+            try {
+                NightFrontMetadataStore.TryAddCalibrationRequirement(path, "L", 180.0, -1, -1);
+
+                // Something is outstanding overall (at 180deg), but nothing at 90deg specifically -
+                // this is what lets NightFrontWhileSameRotationCondition tell "nothing left at this
+                // angle" apart from "nothing left at all."
+                var scoped = NightFrontMetadataStore.PeekNext(path, NoFilterOrder, scopedToAngleDegrees: 90.0);
+
+                Assert.Null(scoped);
+            } finally {
+                File.Delete(path);
+            }
+        }
+
+        [Fact]
+        public void PeekNext_ScopedToAngle_UsesRoundedDegreeEquality() {
+            var path = CreateTempPath();
+            try {
+                // Rounds to 180, same as a scope of 180.0 or 179.6 (which also rounds to 180).
+                NightFrontMetadataStore.TryAddCalibrationRequirement(path, "L", 179.7, -1, -1);
+
+                Assert.NotNull(NightFrontMetadataStore.PeekNext(path, NoFilterOrder, scopedToAngleDegrees: 180.0));
+                Assert.NotNull(NightFrontMetadataStore.PeekNext(path, NoFilterOrder, scopedToAngleDegrees: 179.6));
+                // Rounds to 181, a different whole degree - out of scope even though the raw values
+                // are barely 0.7deg apart.
+                Assert.Null(NightFrontMetadataStore.PeekNext(path, NoFilterOrder, scopedToAngleDegrees: 180.6));
+            } finally {
+                File.Delete(path);
+            }
+        }
+
+        [Fact]
+        public void ClaimNext_ScopedToAngle_OnlyClaimsFromThatAngle() {
+            var path = CreateTempPath();
+            try {
+                NightFrontMetadataStore.TryAddCalibrationRequirement(path, "Ha", 90.0, -1, -1);
+                NightFrontMetadataStore.TryAddCalibrationRequirement(path, "L", 180.0, -1, -1);
+
+                var claimed = NightFrontMetadataStore.ClaimNext(path, NoFilterOrder, scopedToAngleDegrees: 180.0);
+
+                Assert.Equal("L", claimed.Filter);
+                // "Ha" at 90deg must still be outstanding, not claimed.
+                Assert.False(NightFrontMetadataStore.Load(path).CalibrationRequirements.Single(r => r.Filter == "Ha").Claimed);
+            } finally {
+                File.Delete(path);
+            }
+        }
+
+        [Fact]
+        public void ClaimNext_ScopedToAngle_RegressionForRealProductionBug_HigherRankedFilterAtADifferentAngleDoesNotJumpTheQueue() {
+            // Reproduces a real production metadata file: two "L" requirements at very different
+            // angles plus a "B" requirement within 1 degree of the first "L," with filterOrder
+            // ranking "L" ahead of "B". Before scopedToAngleDegrees existed, claiming/peeking after
+            // the first "L" completed would jump straight to the second "L" (globally next-best by
+            // filterOrder) even though "B" was legitimately next at the CURRENT angle - the
+            // surrounding NightFrontWhileSameRotationCondition loop would then see that as an angle
+            // change and stop, leaving "B" never shot. Scoping every claim/peek to the current angle
+            // fixes this: "B" is found before the loop ever considers moving to the second "L"'s angle.
+            var path = CreateTempPath();
+            try {
+                NightFrontMetadataStore.TryAddCalibrationRequirement(path, "B", 179.97581481933594, -1, -1);
+                NightFrontMetadataStore.TryAddCalibrationRequirement(path, "L", 179.9295654296875, -1, -1);
+                NightFrontMetadataStore.TryAddCalibrationRequirement(path, "L", 134.90821838378906, -1, -1);
+                var filterOrder = new List<string> { "L", "B" };
+
+                // NightFrontRotateToNextAngleInstruction picks the globally-next-best (unscoped) entry
+                // and physically rotates there first - that's "L" at ~180deg.
+                var rotateTo = NightFrontMetadataStore.PeekNext(path, filterOrder);
+                Assert.Equal("L", rotateTo.Filter);
+                var currentAngle = Math.Round(rotateTo.RotationAngle, MidpointRounding.AwayFromZero);
+
+                // The flats instruction claims scoped to that angle, shoots it, marks it complete.
+                var firstClaim = NightFrontMetadataStore.ClaimNext(path, filterOrder, scopedToAngleDegrees: currentAngle);
+                Assert.Equal("L", firstClaim.Filter);
+                Assert.Equal(180.0, currentAngle);
+                NightFrontMetadataStore.MarkCompleted(path, firstClaim.Id);
+
+                // The loop condition re-checks, scoped to the SAME angle - must find "B", not fail to
+                // find anything (which is what an unscoped PeekNext would have done here, since the
+                // second "L" at 135deg outranks "B" globally).
+                var stillAtThisAngle = NightFrontMetadataStore.PeekNext(path, filterOrder, scopedToAngleDegrees: currentAngle);
+                Assert.NotNull(stillAtThisAngle);
+                Assert.Equal("B", stillAtThisAngle.Filter);
+
+                // The flats instruction claims and completes it too.
+                var secondClaim = NightFrontMetadataStore.ClaimNext(path, filterOrder, scopedToAngleDegrees: currentAngle);
+                Assert.Equal("B", secondClaim.Filter);
+                NightFrontMetadataStore.MarkCompleted(path, secondClaim.Id);
+
+                // Now nothing remains at this angle - the loop correctly stops.
+                Assert.Null(NightFrontMetadataStore.PeekNext(path, filterOrder, scopedToAngleDegrees: currentAngle));
+
+                // But the second "L" at 135deg is still outstanding overall, for the outer loop to
+                // rotate to next.
+                var remaining = NightFrontMetadataStore.PeekNext(path, filterOrder);
+                Assert.Equal("L", remaining.Filter);
+                Assert.Equal(135.0, Math.Round(remaining.RotationAngle, MidpointRounding.AwayFromZero));
+            } finally {
+                File.Delete(path);
+            }
+        }
+
+        [Fact]
+        public void ClaimNext_ScopedToAngle_FallsBackToUnscoped_WhenCallerChoosesTo_ReturnsNullOtherwise() {
+            // ClaimNext/PeekNext themselves never silently fall back to a different angle when scoped
+            // - that composition (try scoped, then fall back to unscoped) is the caller's own
+            // responsibility (see NightFrontFlatsInstructionBase.Execute), so this just confirms the
+            // scoped call alone returns null rather than reaching across to a different angle.
+            var path = CreateTempPath();
+            try {
+                NightFrontMetadataStore.TryAddCalibrationRequirement(path, "L", 45.0, -1, -1);
+
+                Assert.Null(NightFrontMetadataStore.ClaimNext(path, NoFilterOrder, scopedToAngleDegrees: 180.0));
+                Assert.NotNull(NightFrontMetadataStore.ClaimNext(path, NoFilterOrder));
+            } finally {
+                File.Delete(path);
+            }
+        }
     }
 }

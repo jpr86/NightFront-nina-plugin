@@ -115,15 +115,16 @@ namespace JeffRidder.NINA.Nightfront.Import {
 
         /// <summary>
         /// Atomically marks the next outstanding calibration requirement as claimed and returns it, or
-        /// null if none remain. Two concurrent callers (e.g. two sequence branches sharing one
-        /// metadata file) can never both claim the same entry - the second caller sees it already
-        /// claimed and gets the next one (or null). <paramref name="filterOrder"/> (may be null/empty)
-        /// ranks entries by filter name - see SelectNext.
+        /// null if none remain (or none remain within <paramref name="scopedToAngleDegrees"/>, if
+        /// given). Two concurrent callers (e.g. two sequence branches sharing one metadata file) can
+        /// never both claim the same entry - the second caller sees it already claimed and gets the
+        /// next one (or null). <paramref name="filterOrder"/> (may be null/empty) ranks entries by
+        /// filter name - see SelectNext.
         /// </summary>
-        public static NightFrontCalibrationRequirement ClaimNext(string livePath, IReadOnlyList<string> filterOrder) {
+        public static NightFrontCalibrationRequirement ClaimNext(string livePath, IReadOnlyList<string> filterOrder, double? scopedToAngleDegrees = null) {
             lock (syncLock) {
                 var live = LoadUnlocked(livePath);
-                var next = SelectNext(live, filterOrder);
+                var next = SelectNext(live, filterOrder, scopedToAngleDegrees);
                 if (next == null) {
                     return null;
                 }
@@ -140,10 +141,10 @@ namespace JeffRidder.NINA.Nightfront.Import {
 
         /// <summary>Read-only equivalent of ClaimNext - the current next outstanding entry, without
         /// claiming it.</summary>
-        public static NightFrontCalibrationRequirement PeekNext(string livePath, IReadOnlyList<string> filterOrder) {
+        public static NightFrontCalibrationRequirement PeekNext(string livePath, IReadOnlyList<string> filterOrder, double? scopedToAngleDegrees = null) {
             lock (syncLock) {
                 var live = LoadUnlocked(livePath);
-                return SelectNext(live, filterOrder);
+                return SelectNext(live, filterOrder, scopedToAngleDegrees);
             }
         }
 
@@ -209,10 +210,37 @@ namespace JeffRidder.NINA.Nightfront.Import {
         /// stable tie-break (LINQ's OrderBy is stable, so this falls out of Where/OrderBy without an
         /// explicit secondary sort). A null/empty filterOrder ranks every filter equally, so original
         /// list order alone determines the result - i.e. today's FIFO behavior.
+        ///
+        /// When <paramref name="scopedToAngleDegrees"/> is given, candidates are first narrowed to
+        /// those whose RotationAngle rounds (MidpointRounding.AwayFromZero) to the same whole degree
+        /// as it does - the exact same "rounded to the nearest whole degree" standard
+        /// NightFrontWhileSameRotationCondition's own doc comment already documents, reused here
+        /// rather than introducing a second, differently-shaped tolerance concept (e.g. a raw ±1°
+        /// window, which can disagree with rounding right at a half-degree boundary). Returns null if
+        /// nothing outstanding matches that angle, even if other angles still have outstanding work -
+        /// this is what lets a scoped caller (NightFrontWhileSameRotationCondition) tell "nothing left
+        /// at this angle" apart from "nothing left at all."
+        ///
+        /// This scoping exists to fix a real bug: without it, once the single highest-filterOrder-rank
+        /// entry at the current angle is completed, the next-best entry by filterOrder ALONE could sit
+        /// at a completely different angle (e.g. two "L" requirements at different angles, with a "B"
+        /// requirement genuinely at the current angle ranking below "L") - SelectNext would jump to
+        /// that other angle's entry, which NightFrontWhileSameRotationCondition then (correctly, given
+        /// what it was handed) sees as an angle change and stops on, skipping the same-angle "B" entry
+        /// that never got a turn. Confirmed against a real production metadata file where exactly this
+        /// happened (an "L" and a "B" requirement within 0.05deg of each other, "L" ranked first and
+        /// completed, "B" left outstanding because a second, unrelated "L" requirement at a ~45deg
+        /// different angle outranked it in the unscoped selection).
         /// </summary>
-        private static NightFrontCalibrationRequirement SelectNext(NightFrontPlanMetadata live, IReadOnlyList<string> filterOrder) {
-            return live.CalibrationRequirements
-                .Where(r => r.FlatsCompletedDate == null && !r.Claimed)
+        private static NightFrontCalibrationRequirement SelectNext(NightFrontPlanMetadata live, IReadOnlyList<string> filterOrder, double? scopedToAngleDegrees = null) {
+            var candidates = live.CalibrationRequirements.Where(r => r.FlatsCompletedDate == null && !r.Claimed);
+
+            if (scopedToAngleDegrees.HasValue) {
+                var scopedRounded = Math.Round(scopedToAngleDegrees.Value, MidpointRounding.AwayFromZero);
+                candidates = candidates.Where(r => Math.Round(r.RotationAngle, MidpointRounding.AwayFromZero) == scopedRounded);
+            }
+
+            return candidates
                 .OrderBy(r => FilterRank(r.Filter, filterOrder))
                 .FirstOrDefault();
         }
