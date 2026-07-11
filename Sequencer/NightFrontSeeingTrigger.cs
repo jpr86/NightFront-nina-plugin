@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -57,9 +58,10 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
             Comparator = copyMe.Comparator;
             PollingIntervalMinutes = copyMe.PollingIntervalMinutes;
             DataSourceUrlOverride = copyMe.DataSourceUrlOverride;
-            // Deliberately not carried over: wasConditionTrue/the live poller state. A clone starts
-            // fresh - its first sample is baseline-only (see ShouldFire), matching a freshly-added
-            // trigger's own behavior rather than assuming the clone's history is still relevant.
+            // Deliberately not carried over: wasConditionTrue/firedAtUtc/the live poller state. A
+            // clone starts fresh - its first sample is baseline-only (see ShouldFire), matching a
+            // freshly-added trigger's own behavior rather than assuming the clone's history (or its
+            // re-arm clock) is still relevant.
             // TriggerRunner is freshly constructed by this() above, so it starts empty already.
             foreach (var item in copyMe.TriggerRunner.Items) {
                 TriggerRunner.Add((ISequenceItem)item.Clone());
@@ -68,6 +70,73 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
 
         public override object Clone() {
             return new NightFrontSeeingTrigger(this);
+        }
+
+        /// <summary>
+        /// Finds every NightFrontSeeingTrigger anywhere in the whole sequence tree containing
+        /// <paramref name="from"/> (walks up to the ultimate root, same starting point as
+        /// NightFrontContainer.FindAnywhere, then searches every descendant depth-first) and
+        /// returns whichever has the most recent successful, non-null LastSampleTimeUtc/
+        /// LastFwhmArcsec pair - or null if none exists or none has ever sampled successfully. Used
+        /// by NightFrontReplanInstruction to feed a live seeing reading into the replan the same
+        /// way it already reads live cloud cover from NINA's own weather mediator, in-process, no
+        /// sidecar file of its own.
+        ///
+        /// Unlike NightFrontContainer.FindAnywhere (which only needs to find one container and can
+        /// stop at the first match), this must consider every trigger site in the tree: a
+        /// NightFrontSeeingTrigger attaches to a container via that container's Triggers
+        /// collection, not its Items collection, so the search descends into both - and, for
+        /// completeness on the pathological case of a Seeing Trigger's own action container
+        /// nesting another Seeing Trigger, into each found trigger's own TriggerRunner as well.
+        /// </summary>
+        public static NightFrontSeeingTrigger FindMostRecentlySampled(ISequenceItem from) {
+            ISequenceContainer root = from?.Parent;
+            if (root == null) {
+                return null;
+            }
+            while (root.Parent != null) {
+                root = root.Parent;
+            }
+
+            var visited = new HashSet<object>(ReferenceEqualityComparer.Instance);
+            var found = new List<NightFrontSeeingTrigger>();
+            CollectFromContainer(root, visited, found);
+
+            return found
+                .Where(t => t.LastFwhmArcsec.HasValue && t.LastSampleTimeUtc.HasValue)
+                .OrderByDescending(t => t.LastSampleTimeUtc)
+                .FirstOrDefault();
+        }
+
+        private static void CollectFromContainer(ISequenceContainer container, HashSet<object> visited, List<NightFrontSeeingTrigger> found) {
+            if (container == null || !visited.Add(container)) {
+                return;
+            }
+
+            foreach (var item in container.Items) {
+                if (item is ISequenceContainer nestedContainer) {
+                    CollectFromContainer(nestedContainer, visited, found);
+                }
+            }
+
+            if (container is ITriggerable triggerable) {
+                foreach (var trigger in triggerable.Triggers) {
+                    CollectFromTrigger(trigger, visited, found);
+                }
+            }
+        }
+
+        private static void CollectFromTrigger(ISequenceTrigger trigger, HashSet<object> visited, List<NightFrontSeeingTrigger> found) {
+            if (trigger == null || !visited.Add(trigger)) {
+                return;
+            }
+
+            if (trigger is NightFrontSeeingTrigger seeingTrigger) {
+                found.Add(seeingTrigger);
+                if (seeingTrigger.TriggerRunner != null) {
+                    CollectFromContainer(seeingTrigger.TriggerRunner, visited, found);
+                }
+            }
         }
 
         [JsonProperty]
@@ -91,8 +160,14 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
 
         public IList<string> Issues { get; set; } = new List<string>();
 
+        /// <summary>How long a live reading stays trusted to beat the forecast during a replan -
+        /// mirrors NightFrontApp's own LIVE_OVERRIDE_WINDOW_SEC (forecast/LiveWeatherOverride.kt).
+        /// Also the re-arm horizon below: keep both in sync if either changes.</summary>
+        private static readonly TimeSpan LiveDataHorizon = TimeSpan.FromHours(2);
+
         private volatile SeeingSample latestSample;
         private bool? wasConditionTrue;
+        private DateTime? firedAtUtc;
 
         private CancellationTokenSource pollerCts;
         private Task pollerTask;
@@ -111,7 +186,9 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
 
         public double? LastFwhmArcsec {
             get => lastFwhmArcsec;
-            private set {
+            // internal, not private: lets NightFrontSeeingTriggerTests seed a trigger's last-sample
+            // state directly to test FindMostRecentlySampled without needing a live poller/host.
+            internal set {
                 lastFwhmArcsec = value;
                 RaisePropertyChangedOnUIThread(nameof(LastFwhmArcsec));
             }
@@ -121,7 +198,7 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
 
         public DateTime? LastSampleTimeUtc {
             get => lastSampleTimeUtc;
-            private set {
+            internal set {
                 lastSampleTimeUtc = value;
                 RaisePropertyChangedOnUIThread(nameof(LastSampleTimeUtc));
             }
@@ -200,22 +277,25 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                 sample = new SeeingSample(false, null, null, null, "", ex.Message);
             }
 
+            // latestSample always updates (ShouldTrigger does its own IsStale re-check against it),
+            // but LastFwhmArcsec/LastSampleTimeUtc - the pair FindMostRecentlySampled reads to feed
+            // a live reading into a replan - only update together, and only on a trusted (successful
+            // AND fresh) sample, so neither the sequencer UI readout nor a replan ever sees a number
+            // that's merely "whatever the last poll attempt returned, stale or not."
             latestSample = sample;
-            LastSampleTimeUtc = DateTime.UtcNow;
 
             if (!sample.Success) {
                 StatusMessage = $"Sample failed: {sample.Error}";
-                LastFwhmArcsec = null;
                 return;
             }
 
             if (SeeingSampler.IsStale(sample, DateTime.Now, TimeSpan.FromMinutes(PollingIntervalMinutes * 2))) {
                 StatusMessage = $"Stale data (on-image time {sample.ReportedAtLocal})";
-                LastFwhmArcsec = sample.FwhmArcsec;
                 return;
             }
 
             LastFwhmArcsec = sample.FwhmArcsec;
+            LastSampleTimeUtc = DateTime.UtcNow;
             StatusMessage = $"FWHM {sample.FwhmArcsec:0.00}\" as of {sample.ReportedAtLocal?.ToString("t") ?? "unknown time"}";
         }
 
@@ -242,8 +322,14 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                 ? fwhm <= ThresholdArcsec
                 : fwhm >= ThresholdArcsec;
 
-            var fire = ShouldFire(conditionTrueNow, wasConditionTrue);
+            var timeSinceFired = firedAtUtc.HasValue ? (TimeSpan?)(DateTime.UtcNow - firedAtUtc.Value) : null;
+            var fire = ShouldFire(conditionTrueNow, wasConditionTrue, timeSinceFired, LiveDataHorizon);
             wasConditionTrue = conditionTrueNow;
+            if (fire) {
+                firedAtUtc = DateTime.UtcNow;
+            } else if (!conditionTrueNow) {
+                firedAtUtc = null;
+            }
             return fire;
         }
 
@@ -252,11 +338,20 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
         /// wasConditionTrue == null means "no sample evaluated yet" - the first-ever real sample
         /// only establishes the baseline and never fires by itself, even if it already reads on the
         /// "true" side of the threshold (a plain `bool wasConditionTrue = false` default would
-        /// wrongly treat "already true at trigger startup" as a fresh crossing). Fires only on the
-        /// explicit false-to-true transition; a true-to-true streak or any transition to false does
-        /// not fire.
+        /// wrongly treat "already true at trigger startup" as a fresh crossing). Otherwise fires on
+        /// the explicit false-to-true transition; a true-to-true streak or any transition to false
+        /// does not fire - UNLESS the condition has been continuously true since longer ago than
+        /// rearmAfter (timeSinceFired &gt;= rearmAfter), in which case a still-true reading is
+        /// treated as a fresh crossing and fires again. This matters because a fired reading is only
+        /// trusted to override the forecast for rearmAfter (the same live-data horizon
+        /// NightFrontApp's own replan blend uses) - persistently good/bad conditions should keep
+        /// producing a fresh replan every time that window lapses, not just once for the whole
+        /// spell.
         /// </summary>
-        internal static bool ShouldFire(bool conditionTrueNow, bool? wasConditionTrue) {
+        internal static bool ShouldFire(bool conditionTrueNow, bool? wasConditionTrue, TimeSpan? timeSinceFired, TimeSpan rearmAfter) {
+            if (wasConditionTrue == true && timeSinceFired.HasValue && timeSinceFired.Value >= rearmAfter) {
+                wasConditionTrue = false;
+            }
             return wasConditionTrue == false && conditionTrueNow;
         }
 

@@ -259,7 +259,7 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                 var progressPath = NightFrontMetadataPaths.GetProgressSnapshotPath(folder, progressBaseName);
                 NightFrontProgressSnapshotWriter.Write(progressPath, snapshot);
 
-                var weatherArg = WriteLiveWeatherOverrideOrNone(folder, now);
+                var weatherArg = WriteLiveConditionsOverrideOrNone(folder, now);
 
                 var selectionPath = NightFrontMetadataPaths.GetSelectionPreferencePath(folder);
                 var selectionArg = File.Exists(selectionPath) ? selectionPath : null;
@@ -362,26 +362,45 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
 
         /// <summary>
         /// Reads live cloud cover via IWeatherDataMediator (the same GetInfo()-based pattern
-        /// NightFrontMetadataRecorder already uses for IRotatorMediator) and, if a real reading is
-        /// available, writes it as a NightFront LiveWeatherOverride JSON sidecar and returns its
-        /// path; otherwise returns the literal string "none" (NightFront's own CLI convention for
-        /// "no live reading available" - see Main.kt's runReplan doc comment). CloudCover is only
-        /// trusted when the weather device reports Connected - an unconnected device's GetInfo()
-        /// still returns a WeatherDataInfo instance (never null), just with stale/default field
-        /// values, which would otherwise silently look like a real 0% cloud cover reading.
+        /// NightFrontMetadataRecorder already uses for IRotatorMediator) and live seeing via
+        /// whichever NightFrontSeeingTrigger elsewhere in the sequence has most recently sampled
+        /// successfully (NightFrontSeeingTrigger.FindMostRecentlySampled - in-process, no sidecar
+        /// file of its own, the same "read it directly, no new file" spirit as the weather
+        /// mediator). Each field is independently optional: if only one is available, the JSON
+        /// still gets written with just that field, matching NightFrontApp's own
+        /// LiveWeatherOverride.withLiveWeatherOverride, which now applies each field independently
+        /// too. Returns the written file's path, or the literal string "none" (NightFront's own CLI
+        /// convention for "no live reading available at all" - see Main.kt's runReplan doc comment)
+        /// only when NEITHER field has anything to contribute. CloudCover is only trusted when the
+        /// weather device reports Connected - an unconnected device's GetInfo() still returns a
+        /// WeatherDataInfo instance (never null), just with stale/default field values, which would
+        /// otherwise silently look like a real 0% cloud cover reading. Seeing is only trusted when
+        /// NightFrontSeeingTrigger itself already judged its own last sample fresh (see that
+        /// class's SampleOnceAsync) - this method does no separate staleness check of its own.
         /// </summary>
-        private string WriteLiveWeatherOverrideOrNone(string folder, DateTime now) {
+        private string WriteLiveConditionsOverrideOrNone(string folder, DateTime now) {
             var info = weatherDataMediator?.GetInfo();
-            if (info == null || !info.Connected || double.IsNaN(info.CloudCover)) {
+            var hasCloudCover = info != null && info.Connected && !double.IsNaN(info.CloudCover);
+
+            var seeingTrigger = NightFrontSeeingTrigger.FindMostRecentlySampled(this);
+            var hasSeeing = seeingTrigger?.LastFwhmArcsec != null;
+
+            if (!hasCloudCover && !hasSeeing) {
                 return "none";
             }
 
+            var payload = new Dictionary<string, object> {
+                ["asOfEpochSec"] = ((DateTimeOffset)now.ToUniversalTime()).ToUnixTimeSeconds(),
+            };
+            if (hasCloudCover) {
+                payload["cloudCoverPct"] = (int)Math.Round(info.CloudCover);
+            }
+            if (hasSeeing) {
+                payload["seeingFwhmArcsec"] = seeingTrigger.LastFwhmArcsec.Value;
+            }
+
             var weatherPath = Path.Combine(folder, "live-weather-override.json");
-            var json = JsonConvert.SerializeObject(new {
-                cloudCoverPct = (int)Math.Round(info.CloudCover),
-                asOfEpochSec = ((DateTimeOffset)now.ToUniversalTime()).ToUnixTimeSeconds(),
-            });
-            File.WriteAllText(weatherPath, json);
+            File.WriteAllText(weatherPath, JsonConvert.SerializeObject(payload));
             return weatherPath;
         }
 
