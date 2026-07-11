@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+## 1.1.1.0
+- Added "Seeing Trigger," a new sequence trigger: periodically samples a real-time seeing-monitor
+  data source (e.g. an Alcor "Current Condition" telemetry page, OCR'd via Tesseract) and, only on
+  the transition to a user-configured FWHM threshold, runs whatever instructions you drop into its
+  own action container - independent of NightFront's own plan-execution machinery, so dropping a
+  Replan instruction inside gets seeing-triggered replanning for free. Re-arms after 2 hours (the
+  same live-data horizon a replan trusts a reading for) if the condition stays continuously true,
+  so a persistent good/bad spell produces a fresh replan periodically rather than firing only once.
+  A new "Seeing Data Source URL" plugin option configures the default data source (overridable
+  per-trigger).
+- Replan now blends a live seeing reading into the forecast the same way it already blends live
+  cloud cover: if a Seeing Trigger elsewhere in the sequence has a fresh sample, its FWHM reading is
+  included alongside cloud cover in the live-conditions override handed to the NightFront CLI.
+- Fixed NightFront While Same Rotation stopping early and skipping a still-outstanding,
+  lower-filter-order-ranked calibration requirement genuinely at the current rotation angle, in
+  favor of a higher-ranked filter sitting at a completely different angle. Confirmed against a real
+  production metadata file (an "L" and "B" requirement within 0.05deg of each other; a second,
+  unrelated "L" requirement ~45deg away jumped the queue ahead of "B" once the first "L" completed).
+  NightFront Sky Flats/Trained Flats now also prefer whatever's outstanding at the rotator's current
+  physical angle before falling back to the globally-next-best entry.
+
 ## 1.1.0.0
 - Added "Replan After Safety Recovery," a new sequence instruction for unattended recovery from a
   safety-monitor interruption: place it inside your sequence's own "Once Safe" recovery branch and
