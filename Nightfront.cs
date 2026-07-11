@@ -99,15 +99,13 @@ namespace JeffRidder.NINA.Nightfront {
             }
         }
 
-        // Path to whatever actually launches the NightFront CLI - e.g. a native NightFront-cli.exe
-        // if one is ever packaged, or (today, since no such packaging exists yet) a small wrapper
-        // batch/cmd script the user writes once that runs `java -jar <path-to-nightfront.jar> %*`.
-        // NightFrontReplanInstruction runs this with `replan <args...>` appended - see its own doc
-        // comment for the full argument list. This indirection (a configurable path, rather than
-        // NightFrontReplanInstruction hardcoding how to invoke a JVM app) is a deliberate, narrower
-        // stopgap: packaging a proper native CLI launcher alongside the existing GUI installer is a
-        // real, separate follow-up (see todos/nina-safety-delay-plan.md's Phase 3 status), not
-        // solved here.
+        // Optional manual override for the NightFront CLI path - not exposed in the Options UI.
+        // NightFrontReplanInstruction now finds nightfront-cli.exe automatically, co-located with
+        // this plugin's own assembly (NightFront.csproj's PostBuild step builds and copies it
+        // there via BuildNativeCli.bat). This setting only matters if that auto-resolved file is
+        // missing (e.g. the sibling NightFrontApp checkout wasn't present when this plugin was
+        // built) or a hand-editing user.config wants to point at a different build - see
+        // NightFrontReplanInstruction.ResolveCliPath.
         public string NightFrontCliPath {
             get {
                 return Settings.Default.NightFrontCliPath;
@@ -131,21 +129,6 @@ namespace JeffRidder.NINA.Nightfront {
             };
             if (dialog.ShowDialog() == true) {
                 NightFrontDataFolder = dialog.SelectedPath;
-            }
-        }
-
-        private ICommand selectNightFrontCliPathCommand;
-
-        public ICommand SelectNightFrontCliPathCommand => selectNightFrontCliPathCommand ??= new CommunityToolkit.Mvvm.Input.RelayCommand(SelectNightFrontCliPath);
-
-        private void SelectNightFrontCliPath() {
-            var dialog = new VistaOpenFileDialog {
-                Title = "Select the NightFront CLI executable (or a wrapper script that launches it)",
-                Filter = "Executable files (*.exe;*.bat;*.cmd)|*.exe;*.bat;*.cmd|All files (*.*)|*.*",
-                FileName = NightFrontCliPath
-            };
-            if (dialog.ShowDialog() == true) {
-                NightFrontCliPath = dialog.FileName;
             }
         }
 

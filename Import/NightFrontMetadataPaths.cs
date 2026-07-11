@@ -13,6 +13,9 @@ namespace JeffRidder.NINA.Nightfront.Import {
     /// instructions/conditions find that same file without the user re-typing its name everywhere.
     /// It's also the one place that knows about every kind of NightFront-written sidecar file, so
     /// FindTodaysPlanFile can exclude all of them from its "what's the actual plan file" scan.
+    /// Also owns resolving the NightFront CLI's own path (ResolveCliPath/CoLocatedCliPath) - not a
+    /// sidecar of a plan file, but the same kind of "where does the plugin find a file it depends
+    /// on" logic this class already centralizes for everything else.
     /// </summary>
     public static class NightFrontMetadataPaths {
         private const string LiveMetadataSuffix = ".metadata.json";
@@ -198,6 +201,37 @@ namespace JeffRidder.NINA.Nightfront.Import {
                 ? "No calibration metadata file was found in the NightFront data folder."
                 : $"Multiple calibration metadata files found in the NightFront data folder; set a specific name to disambiguate: {string.Join(", ", candidates)}.";
             return null;
+        }
+
+        /// <summary>The nightfront-cli.exe path NightFrontApp's build.gradle.kts (graalvmNative,
+        /// imageName "nightfront-cli") and NightFront.csproj's PostBuild step (BuildNativeCli.bat)
+        /// agree to co-locate the native CLI at, alongside this plugin's own assembly - computed
+        /// regardless of whether the file actually exists there, so ResolveCliPath and a
+        /// diagnostic-only caller (Validate's "not found" message) can share one definition of
+        /// "where it should be" instead of duplicating the Path.Combine.</summary>
+        public static string CoLocatedCliPath(string assemblyLocation) {
+            var assemblyDir = Path.GetDirectoryName(assemblyLocation);
+            return assemblyDir == null ? null : Path.Combine(assemblyDir, "nightfront-cli.exe");
+        }
+
+        /// <summary>
+        /// Resolves the NightFront CLI path. Prefers <paramref name="overridePath"/> (typically
+        /// Settings.Default.NightFrontCliPath) when it's set AND points at a file that actually
+        /// exists - a manual override with no UI (hand-edited user.config), covering the case where
+        /// the co-located build is missing, e.g. the sibling NightFrontApp checkout wasn't present
+        /// when this plugin was built. Otherwise resolves to <see cref="CoLocatedCliPath"/> - built
+        /// and copied there automatically by NightFront.csproj's PostBuild step (BuildNativeCli.bat),
+        /// so the common case needs no configuration at all. Returns null if neither resolves to an
+        /// existing file. <paramref name="assemblyLocation"/> is threaded through (rather than
+        /// calling Assembly.GetExecutingAssembly().Location directly) so this stays a small, pure,
+        /// independently testable function, matching this class's other path-resolution helpers.
+        /// </summary>
+        public static string ResolveCliPath(string overridePath, string assemblyLocation) {
+            if (!string.IsNullOrWhiteSpace(overridePath) && File.Exists(overridePath)) {
+                return overridePath;
+            }
+            var coLocatedPath = CoLocatedCliPath(assemblyLocation);
+            return coLocatedPath != null && File.Exists(coLocatedPath) ? coLocatedPath : null;
         }
 
         private static bool IsMetadataFile(string path) {

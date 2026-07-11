@@ -44,19 +44,6 @@
                     ItemsSource="{Binding ReplanEffortLevelOptions}"
                     SelectedItem="{Binding ReplanEffortLevel, Mode=TwoWay}" />
             </StackPanel>
-            <StackPanel Margin="0,5,0,0" Orientation="Horizontal">
-                <TextBlock VerticalAlignment="Center" Text="NightFront CLI Path" />
-                <TextBox
-                    MinWidth="250"
-                    Margin="5,0,0,0"
-                    IsReadOnly="True"
-                    ToolTip="Path to the NightFront CLI executable, or a wrapper script that launches it (e.g. a .bat running `java -jar NightFront.jar %*`). Used by Replan After Safety Recovery to re-solve the remainder of the night."
-                    Text="{Binding NightFrontCliPath, Mode=OneWay}" />
-                <Button
-                    Margin="5,0,0,0"
-                    Command="{Binding SelectNightFrontCliPathCommand}"
-                    Content="Browse..." />
-            </StackPanel>
         </StackPanel>
     </DataTemplate>
 </ResourceDictionary>

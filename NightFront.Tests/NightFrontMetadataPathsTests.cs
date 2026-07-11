@@ -224,6 +224,90 @@ namespace JeffRidder.NINA.Nightfront.Tests {
             }
         }
 
+        // ── ResolveCliPath / CoLocatedCliPath ─────────────────────────────────────────────────
+
+        [Fact]
+        public void ResolveCliPath_NoOverride_ResolvesTheCoLocatedExeWhenPresent() {
+            var assemblyDir = CreateTempFolder();
+            File.WriteAllText(Path.Combine(assemblyDir, "nightfront-cli.exe"), "stub");
+            try {
+                var result = NightFrontMetadataPaths.ResolveCliPath(
+                    overridePath: null, assemblyLocation: Path.Combine(assemblyDir, "JeffRidder.NINA.Nightfront.dll"));
+
+                Assert.Equal(Path.Combine(assemblyDir, "nightfront-cli.exe"), result);
+            } finally {
+                Directory.Delete(assemblyDir, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void ResolveCliPath_NoOverrideAndNoCoLocatedExe_ReturnsNull() {
+            var assemblyDir = CreateTempFolder();
+            try {
+                var result = NightFrontMetadataPaths.ResolveCliPath(
+                    overridePath: "", assemblyLocation: Path.Combine(assemblyDir, "JeffRidder.NINA.Nightfront.dll"));
+
+                Assert.Null(result);
+            } finally {
+                Directory.Delete(assemblyDir, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void ResolveCliPath_ExistingOverride_TakesPrecedenceOverTheCoLocatedExe() {
+            var assemblyDir = CreateTempFolder();
+            File.WriteAllText(Path.Combine(assemblyDir, "nightfront-cli.exe"), "stub");
+            var overridePath = Path.Combine(CreateTempFolder(), "override.exe");
+            File.WriteAllText(overridePath, "stub");
+            try {
+                var result = NightFrontMetadataPaths.ResolveCliPath(
+                    overridePath, assemblyLocation: Path.Combine(assemblyDir, "JeffRidder.NINA.Nightfront.dll"));
+
+                Assert.Equal(overridePath, result);
+            } finally {
+                Directory.Delete(assemblyDir, recursive: true);
+                Directory.Delete(Path.GetDirectoryName(overridePath), recursive: true);
+            }
+        }
+
+        [Fact]
+        public void ResolveCliPath_OverrideSetButMissing_FallsBackToTheCoLocatedExe() {
+            // A stale/hand-typo'd NightFrontCliPath shouldn't silently break replan if a good
+            // co-located build exists - only an override that actually resolves wins.
+            var assemblyDir = CreateTempFolder();
+            File.WriteAllText(Path.Combine(assemblyDir, "nightfront-cli.exe"), "stub");
+            try {
+                var result = NightFrontMetadataPaths.ResolveCliPath(
+                    overridePath: @"C:\this\path\does\not\exist.exe",
+                    assemblyLocation: Path.Combine(assemblyDir, "JeffRidder.NINA.Nightfront.dll"));
+
+                Assert.Equal(Path.Combine(assemblyDir, "nightfront-cli.exe"), result);
+            } finally {
+                Directory.Delete(assemblyDir, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void ResolveCliPath_NeitherOverrideNorCoLocatedExeExist_ReturnsNull() {
+            var assemblyDir = CreateTempFolder();
+            try {
+                var result = NightFrontMetadataPaths.ResolveCliPath(
+                    overridePath: @"C:\this\path\does\not\exist.exe",
+                    assemblyLocation: Path.Combine(assemblyDir, "JeffRidder.NINA.Nightfront.dll"));
+
+                Assert.Null(result);
+            } finally {
+                Directory.Delete(assemblyDir, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void CoLocatedCliPath_IsAlwaysComputedRegardlessOfWhetherTheFileExists() {
+            var result = NightFrontMetadataPaths.CoLocatedCliPath(@"C:\Plugins\JeffRidder.NINA.Nightfront\JeffRidder.NINA.Nightfront.dll");
+
+            Assert.Equal(@"C:\Plugins\JeffRidder.NINA.Nightfront\nightfront-cli.exe", result);
+        }
+
         private static string CreateTempFolder() {
             var folder = Path.Combine(Path.GetTempPath(), "NightFrontTests_" + Guid.NewGuid());
             Directory.CreateDirectory(folder);

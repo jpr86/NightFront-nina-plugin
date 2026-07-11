@@ -94,5 +94,10 @@ namespace JeffRidder.NINA.Nightfront.Tests {
             Assert.Equal("SELECTION", args[6]);
             Assert.Equal(7, args.Count);
         }
+
+        // ResolveCliPath/CoLocatedCliPath moved to NightFrontMetadataPaths (see its own
+        // ResolveCliPath_* tests in NightFrontMetadataPathsTests.cs) - it's the same "where does
+        // the plugin find a file it depends on" logic that class already centralizes for every
+        // other NightFront-related sidecar path.
     }
 }

@@ -47,5 +47,10 @@
   <PropertyGroup />
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
     <Exec Command="&#xD;&#xA;if not exist &quot;%25localappdata%25\NINA\Plugins\3.0.0&quot; (&#xD;&#xA;  echo &quot;Creating $(PlatformName) Plugins folder&quot;&#xD;&#xA;  mkdir &quot;%25localappdata%25\NINA\Plugins\3.0.0&quot;&#xD;&#xA;)&#xD;&#xA;if not exist &quot;%25localappdata%25\NINA\Plugins\3.0.0\$(TargetName)&quot; (&#xD;&#xA;  echo &quot;Creating $(PlatformName) Plugins $(TargetName) folder&quot;&#xD;&#xA;  mkdir &quot;%25localappdata%25\NINA\Plugins\3.0.0\$(TargetName)&quot;&#xD;&#xA;)&#xD;&#xA;&#xD;&#xA;echo &quot;Copying $(PlatformName) $(TargetName) and its dependencies&quot;&#xD;&#xA;xcopy &quot;$(TargetDir)*.*&quot; &quot;%25localappdata%25\NINA\Plugins\3.0.0\$(TargetName)&quot; /h/i/c/k/e/r/y&#xD;&#xA;" />
+    <!-- Builds the NightFront CLI as a native-image executable and copies it alongside the plugin
+         DLL, so NightFrontReplanInstruction can find it at a known, co-located path with no
+         user-configured NightFrontCliPath required (todos/nina-safety-delay-plan.md). See
+         BuildNativeCli.bat's own doc comment for why this never fails the plugin build. -->
+    <Exec Command="&quot;$(ProjectDir)BuildNativeCli.bat&quot; &quot;%25localappdata%25\NINA\Plugins\3.0.0\$(TargetName)&quot;" />
   </Target>
 </Project>

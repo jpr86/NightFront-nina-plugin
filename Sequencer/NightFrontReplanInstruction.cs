@@ -45,8 +45,8 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
     ///    IWeatherDataMediator, the same GetInfo()-based pattern NightFrontMetadataRecorder already
     ///    uses for IRotatorMediator.
     /// 3. Writes the progress snapshot and (if available) a live-weather-override JSON file into
-    ///    the configured NightFront data folder, then spawns the NightFront CLI (Settings.Default.
-    ///    NightFrontCliPath) as `replan --effort=&lt;ReplanEffortLevel&gt; &lt;session-config.json&gt;
+    ///    the configured NightFront data folder, then spawns the NightFront CLI (see
+    ///    NightFrontMetadataPaths.ResolveCliPath) as `replan --effort=&lt;ReplanEffortLevel&gt; &lt;session-config.json&gt;
     ///    &lt;progress-snapshot&gt; &lt;weather-override|none&gt; &lt;output-plan&gt;
     ///    [selection-preference.json]` - see BuildReplanArguments. The `&lt;output-plan&gt;` path
     ///    passed to the CLI is a fresh, GUID-suffixed temp path, deliberately NOT the same file
@@ -72,10 +72,10 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
     /// to know where NightFront's own input config for tonight's plan lives, since it only ever
     /// reads the already-transformed NINA sequence JSON.
     ///
-    /// KNOWN GAP, not solved here: there is no packaged, installer-shipped NightFront CLI executable
-    /// yet (the MSI/AppImage/deb installers only build the Compose Desktop GUI's launcher). Until
-    /// one exists, NightFrontCliPath must point at a user-provided wrapper (e.g. a .bat running
-    /// `java -jar NightFront.jar %*`) - see Nightfront.cs's own doc comment on that setting.
+    /// The NightFront CLI itself is a native-image executable, built and copied alongside this
+    /// plugin's own DLL by NightFront.csproj's PostBuild step (BuildNativeCli.bat) - see
+    /// NightFrontMetadataPaths.ResolveCliPath for how it's located at runtime, and NightFrontApp's
+    /// build.gradle.kts (graalvmNative, regenerateNativeImageConfig) for how it's built.
     /// </summary>
     [ExportMetadata("Name", "Replan")]
     [ExportMetadata("Description", "Place inside (or immediately after) your sequence's own 'Once Safe' recovery branch. Reads tonight's live progress and current weather, re-solves the remainder of the night via the NightFront CLI, and repopulates the NightFront Container with the fresh plan before 'Loop while safe' restarts from the top.")]
@@ -210,8 +210,9 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                 issues.Add("The NightFront data folder is not configured. Set it on the NightFront plugin's Options tab.");
             }
 
-            if (string.IsNullOrWhiteSpace(Settings.Default.NightFrontCliPath)) {
-                issues.Add("The NightFront CLI path is not configured. Set it on the NightFront plugin's Options tab.");
+            var assemblyLocation = System.Reflection.Assembly.GetExecutingAssembly().Location;
+            if (NightFrontMetadataPaths.ResolveCliPath(Settings.Default.NightFrontCliPath, assemblyLocation) == null) {
+                issues.Add($"The NightFront CLI could not be found (expected at \"{NightFrontMetadataPaths.CoLocatedCliPath(assemblyLocation)}\"). It should be deployed automatically alongside this plugin - rebuild the plugin with a sibling NightFrontApp checkout present, or set NightFrontCliPath manually.");
             }
 
             if (NightFrontContainer.FindAnywhere(this) == null) {
@@ -230,6 +231,12 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
             var container = NightFrontContainer.FindAnywhere(this);
             if (container == null) {
                 throw new NightFrontImportException("Replan could not find a NightFront Container anywhere in this sequence.");
+            }
+
+            var assemblyLocation = System.Reflection.Assembly.GetExecutingAssembly().Location;
+            var cliPath = NightFrontMetadataPaths.ResolveCliPath(Settings.Default.NightFrontCliPath, assemblyLocation);
+            if (cliPath == null) {
+                throw new NightFrontImportException($"The NightFront CLI could not be found (expected at \"{NightFrontMetadataPaths.CoLocatedCliPath(assemblyLocation)}\").");
             }
 
             var configPath = NightFrontMetadataPaths.GetSessionConfigPath(folder);
@@ -276,7 +283,7 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                     Settings.Default.ReplanEffortLevel, configPath, progressPath, weatherArg, cliOutputPath, selectionArg);
 
                 progress?.Report(new ApplicationStatus { Status = "NightFront: replanning the remainder of the night" });
-                var (exitCode, stdOut, stdErr) = await RunNightFrontCli(Settings.Default.NightFrontCliPath, arguments, token);
+                var (exitCode, stdOut, stdErr) = await RunNightFrontCli(cliPath, arguments, token);
 
                 if (exitCode != 0) {
                     var output = string.IsNullOrWhiteSpace(stdErr) ? stdOut : stdErr;
