@@ -182,6 +182,48 @@ namespace JeffRidder.NINA.Nightfront.Tests {
             }
         }
 
+        [Fact]
+        public void GetReplanHistoryFolder_IsASubfolderOfTheDataFolder() {
+            var result = NightFrontMetadataPaths.GetReplanHistoryFolder("C:\\NightFrontData");
+
+            Assert.Equal(Path.Combine("C:\\NightFrontData", "replan-history"), result);
+        }
+
+        [Fact]
+        public void GetReplanHistoryPath_IsTimestampedSoSameNightReplansDoNotCollide() {
+            var first = NightFrontMetadataPaths.GetReplanHistoryPath(
+                "C:\\NightFrontData", "TargetsForTonight_2026-07-06.json", new DateTime(2026, 7, 6, 22, 15, 0));
+            var second = NightFrontMetadataPaths.GetReplanHistoryPath(
+                "C:\\NightFrontData", "TargetsForTonight_2026-07-06.json", new DateTime(2026, 7, 7, 1, 30, 0));
+
+            Assert.NotEqual(first, second);
+            Assert.Equal(Path.Combine("C:\\NightFrontData", "replan-history", "20260706-221500_TargetsForTonight_2026-07-06.json"), first);
+            Assert.Equal(Path.Combine("C:\\NightFrontData", "replan-history", "20260707-013000_TargetsForTonight_2026-07-06.json"), second);
+        }
+
+        [Fact]
+        public void FindTodaysPlanFile_DoesNotDescendIntoTheReplanHistorySubfolder() {
+            // A dated plan-file copy sitting inside replan-history (an archived pre-replan snapshot -
+            // see NightFrontReplanInstruction.ArchivePreviousPlanFileIfPresent) must never be mistaken
+            // for today's real plan file, the same way the other sidecar exclusions work - but here
+            // it's guaranteed for free by Directory.EnumerateFiles' default non-recursive search,
+            // rather than needing its own explicit exclusion clause.
+            var folder = CreateTempFolder();
+            try {
+                var today = new DateTime(2026, 7, 6);
+                var historyFolder = NightFrontMetadataPaths.GetReplanHistoryFolder(folder);
+                Directory.CreateDirectory(historyFolder);
+                File.WriteAllText(Path.Combine(historyFolder, "20260706-201500_TargetsForTonight_2026-07-06.json"), "{}");
+                File.WriteAllText(Path.Combine(folder, "TargetsForTonight_2026-07-06.json"), "{}");
+
+                var result = NightFrontMetadataPaths.FindTodaysPlanFile(folder, today);
+
+                Assert.Equal(Path.Combine(folder, "TargetsForTonight_2026-07-06.json"), result);
+            } finally {
+                Directory.Delete(folder, recursive: true);
+            }
+        }
+
         private static string CreateTempFolder() {
             var folder = Path.Combine(Path.GetTempPath(), "NightFrontTests_" + Guid.NewGuid());
             Directory.CreateDirectory(folder);

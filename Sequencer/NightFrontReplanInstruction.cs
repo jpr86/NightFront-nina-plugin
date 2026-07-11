@@ -302,6 +302,8 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
 
                 container.PopulateItems(imported);
 
+                ArchivePreviousPlanFileIfPresent(folder, finalOutputPath, now);
+
                 try {
                     File.Move(cliOutputPath, finalOutputPath, overwrite: true);
                 } catch (Exception ex) {
@@ -325,6 +327,29 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                 StatusMessage = $"Replan failed: {ex.Message}";
                 LastRunTimestamp = now;
                 throw;
+            }
+        }
+
+        /// <summary>
+        /// Preserves a copy of <paramref name="finalOutputPath"/> (the plan file about to be
+        /// overwritten by a fresh replan) in the replan-history subfolder before that overwrite
+        /// happens, so the pre-replan plan stays available for later comparison instead of being
+        /// silently lost - per explicit request. A no-op if no plan file exists yet at that path (the
+        /// first replan of the night, before any NightFrontUpdateInstruction import ever ran). Uses
+        /// File.Copy (not Move) so finalOutputPath is left in place for the caller's own File.Move to
+        /// then overwrite atomically - this step never removes the file callers are about to replace.
+        /// Best-effort: a failure to archive must not block the replan itself from completing.
+        /// </summary>
+        private static void ArchivePreviousPlanFileIfPresent(string folder, string finalOutputPath, DateTime now) {
+            if (!File.Exists(finalOutputPath)) {
+                return;
+            }
+            try {
+                var historyPath = NightFrontMetadataPaths.GetReplanHistoryPath(folder, Path.GetFileName(finalOutputPath), now);
+                Directory.CreateDirectory(NightFrontMetadataPaths.GetReplanHistoryFolder(folder));
+                File.Copy(finalOutputPath, historyPath, overwrite: true);
+            } catch (Exception ex) {
+                Notification.ShowWarning($"NightFront: could not archive the previous plan file before replanning: {ex.Message}");
             }
         }
 

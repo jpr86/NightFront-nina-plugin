@@ -43,6 +43,16 @@ namespace JeffRidder.NINA.Nightfront.Import {
         /// NightFrontReplanInstruction as `NightFront replan`'s first argument.</summary>
         private const string SessionConfigFileName = "session-config.json";
 
+        /// <summary>Subfolder (relative to the NightFront data folder) that NightFrontReplanInstruction
+        /// archives a snapshot of the plan file into immediately before overwriting it with a fresh
+        /// replan, so the pre-replan plan stays available for later comparison rather than being lost.
+        /// A subfolder, not a same-folder renamed copy, is deliberate: FindTodaysPlanFile's
+        /// Directory.EnumerateFiles(folder, "*.json") only searches the top-level folder by default
+        /// (no SearchOption.AllDirectories), so archived snapshots here are automatically invisible to
+        /// "what's today's plan file" scanning - unlike every other same-folder sidecar this class
+        /// manages, no explicit exclusion clause is needed to keep them out of that scan.</summary>
+        private const string ReplanHistoryFolderName = "replan-history";
+
         /// <summary>
         /// Finds the plan JSON file in <paramref name="folder"/> whose name contains today's date
         /// (yyyy-MM-dd), excluding NightFront's own ".metadata.json"/"archived.metadata.json"/
@@ -82,6 +92,21 @@ namespace JeffRidder.NINA.Nightfront.Import {
         /// required config-file argument.</summary>
         public static string GetSessionConfigPath(string folder) {
             return Path.Combine(folder, SessionConfigFileName);
+        }
+
+        /// <summary>The replan-history subfolder itself (see ReplanHistoryFolderName) - callers that
+        /// need to ensure it exists (e.g. via Directory.CreateDirectory) before writing into it should
+        /// use this rather than deriving the path themselves.</summary>
+        public static string GetReplanHistoryFolder(string folder) {
+            return Path.Combine(folder, ReplanHistoryFolderName);
+        }
+
+        /// <summary>Where to archive a snapshot of <paramref name="originalFileName"/> (the plan file
+        /// about to be overwritten by a fresh replan) before it's overwritten. Timestamped so multiple
+        /// replans the same night - a second safety interruption a few hours after the first - don't
+        /// collide and each overwrite's "before" state is individually recoverable.</summary>
+        public static string GetReplanHistoryPath(string folder, string originalFileName, DateTime timestamp) {
+            return Path.Combine(GetReplanHistoryFolder(folder), $"{timestamp:yyyyMMdd-HHmmss}_{originalFileName}");
         }
 
         /// <summary>

@@ -1,6 +1,22 @@
 ﻿# NightFront
 
 ## Unreleased
+
+## 1.1.0.0
+- Added "Replan After Safety Recovery," a new sequence instruction for unattended recovery from a
+  safety-monitor interruption: place it inside your sequence's own "Once Safe" recovery branch and
+  it reads tonight's live progress and current weather, spawns the NightFront CLI to re-solve the
+  remainder of the night, and repopulates the NightFront Container with the fresh plan before your
+  sequence's native recovery logic restarts execution - so already-completed targets aren't
+  silently re-shot after every interruption. Two new plugin options support it: "Replan Effort
+  Level" (Fast/Balanced/Thorough GA compute budget, defaulting to Fast since most imaging PCs run
+  overnight on modest hardware) and "NightFront CLI Path" (where to find/launch the NightFront
+  CLI - note there's no packaged NightFront CLI executable yet, so this must point at a
+  user-provided wrapper script for now). Requires an updated NightFront app that also exports the
+  new `session-config.json`/`selection.json` sidecars this instruction depends on.
+- The previous plan file is now archived to a timestamped copy in a `replan-history` subfolder
+  before each replan overwrites it, so it stays available for later comparison instead of being
+  silently lost.
 - Fixed calibration metadata (measured rotation angle + filter/gain/offset) being recorded as soon as a target's CenterAndRotate finished, before any of its light exposures had actually completed. It's now recorded per filter, right after that filter's own exposure(s) finish - so a target whose sequence stops partway through its filter list still gets correct metadata for whichever filters actually completed, and never records a filter that hasn't been shot yet.
 - Replaced the separate `archived.metadata.json` file with completion tracking in the single live metadata file: every calibration requirement now carries a `DateAdded` and a `FlatsCompletedDate` (null until a Sky/Trained Flats instruction completes it). NightFront While Same Rotation/While Calibration Remains and the flats instructions all skip completed entries. A new "Flat Refresh Days" plugin option prunes completed entries older than that many days, so a stale one is naturally recreated (and reshot) the next time its target/filter/rotation combination is encountered.
 - Added a "Flat Filter Order" plugin option (comma-separated filter names, e.g. `L, B, G, R, OIII, Ha, SII`) that determines the order Sky Flats, Trained Flats, and their loop conditions claim outstanding calibration requirements in, regardless of the order they were recorded in - useful since twilight sky flats often need specific filters shot while the sky is a particular brightness.
