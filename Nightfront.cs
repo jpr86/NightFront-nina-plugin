@@ -82,7 +82,11 @@ namespace JeffRidder.NINA.Nightfront {
         // unattended during a real weather interruption with no one watching a progress bar to
         // justify a slower solve. A user with a genuinely capable imaging PC can opt into Balanced
         // or Thorough here.
-        public static readonly string[] ReplanEffortLevelOptions = { "Fast", "Balanced", "Thorough" };
+        // Must be an instance property, not a static field — WPF's {Binding ReplanEffortLevelOptions}
+        // resolves via TypeDescriptor.GetProperties(DataContext), which only sees instance
+        // properties, not static members. A static field silently binds to nothing (empty
+        // ItemsSource), which is why the options-tab dropdown showed blank rather than erroring.
+        public string[] ReplanEffortLevelOptions => new[] { "Fast", "Balanced", "Thorough" };
 
         public string ReplanEffortLevel {
             get {
