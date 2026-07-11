@@ -77,7 +77,7 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
     /// one exists, NightFrontCliPath must point at a user-provided wrapper (e.g. a .bat running
     /// `java -jar NightFront.jar %*`) - see Nightfront.cs's own doc comment on that setting.
     /// </summary>
-    [ExportMetadata("Name", "Replan After Safety Recovery")]
+    [ExportMetadata("Name", "Replan")]
     [ExportMetadata("Description", "Place inside (or immediately after) your sequence's own 'Once Safe' recovery branch. Reads tonight's live progress and current weather, re-solves the remainder of the night via the NightFront CLI, and repopulates the NightFront Container with the fresh plan before 'Loop while safe' restarts from the top.")]
     [ExportMetadata("Icon", "NightFront_SVG")]
     [ExportMetadata("Category", "NightFront")]
@@ -215,7 +215,7 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
             }
 
             if (NightFrontContainer.FindAnywhere(this) == null) {
-                issues.Add("Replan After Safety Recovery could not find a NightFront Container anywhere in this sequence.");
+                issues.Add("Replan could not find a NightFront Container anywhere in this sequence.");
             }
 
             Issues = issues;
@@ -229,7 +229,7 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
 
             var container = NightFrontContainer.FindAnywhere(this);
             if (container == null) {
-                throw new NightFrontImportException("Replan After Safety Recovery could not find a NightFront Container anywhere in this sequence.");
+                throw new NightFrontImportException("Replan could not find a NightFront Container anywhere in this sequence.");
             }
 
             var configPath = NightFrontMetadataPaths.GetSessionConfigPath(folder);
