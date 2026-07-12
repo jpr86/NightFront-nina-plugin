@@ -5,10 +5,11 @@ A [N.I.N.A.](https://nighttime-imaging.eu/) plugin that ingests the nightly plan
 your Advanced Sequencer sequence.
 
 NightFront itself — the forecast-aware, multi-night genetic-algorithm optimizer — lives entirely
-in the companion desktop app. This plugin does not schedule or optimize anything on its own; it's
-the execution half: it reads the JSON plan the app exports, builds real NINA sequence items from
-it, lets NINA run them exactly as it would run any hand-built sequence, and can call back into the
-optimizer mid-night when real conditions change.
+in the companion desktop app. This plugin is primarily the execution half: it reads the JSON plan
+the app exports, builds real NINA sequence items from it, and lets NINA run them exactly as it
+would run any hand-built sequence. It's not purely passive, though — it can respond to real
+conditions mid-night by invoking the same optimizer for a limited replan scoped to the remainder
+of that night's schedule, rather than only ever replaying a plan decided before dusk.
 
 ## How it fits into a sequence
 
