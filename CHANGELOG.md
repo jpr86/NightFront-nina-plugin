@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.1.2.0
+- Version-only bump to align with NightFront app v1.1.2 (which adds AstroPM target/exposure-plan
+  import, entirely on the app side) so the plugin/app version numbers signal compatibility. No
+  plugin-side functional change this release.
+
 ## 1.1.1.0
 - Added "Seeing Trigger," a new sequence trigger: periodically samples a real-time seeing-monitor
   data source (e.g. an Alcor "Current Condition" telemetry page, OCR'd via Tesseract) and, only on
