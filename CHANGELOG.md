@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.2.1.0
+- Version-only bump to align with NightFront app v1.2.1 (Long Range Planning effort-preset
+  values differentiated from a real sweep, entirely on the app side). No plugin-side functional
+  change this release.
+
 ## 1.2.0.0
 - Version-only bump to align with NightFront app v1.2.0 (nav-rail consolidation, long-range plan
   Gantt visualization, and an Active-before-Planned water-filling fix, entirely on the app side).
