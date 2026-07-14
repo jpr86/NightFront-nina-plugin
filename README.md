@@ -35,7 +35,7 @@ of that night's schedule, rather than only ever replaying a plan decided before 
 
 ## Relationship to NINA Target Scheduler
 
-[TCPalmer's Target Scheduler](https://tcpalmer.github.io/nina-scheduler/) is a dispatch
+[The NINA Target Scheduler](https://tcpalmer.github.io/nina-scheduler/) is a dispatch
 scheduler: its Scoring Engine picks the next target/exposure plan every exposure using weighted
 rules — project priority, percent complete, meridian windows, target-switch penalty, moon
 avoidance timing, and similar. That scoring runs continuously, but strictly over project/target
