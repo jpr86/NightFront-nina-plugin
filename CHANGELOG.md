@@ -1,6 +1,9 @@
 ﻿# NightFront
 
-## Unreleased
+## 1.3.0.0
+- Aligns with NightFront app v1.3.0, which puts pressure on completing Active targets in Long
+  Range Planning (a new "Planned Target Weight" control, entirely on the app side). Unlike the
+  recent version-only bumps below, this release also carries the two plugin-side fixes here.
 - Fixed CenterAfterDriftTrigger centering on RA 0/Dec 0 for the whole night when placed outside
   the NightFront Container (the production template's own layout, on "Loop while safe") - NINA's
   built-in coordinate inheritance only looks upward from the trigger's own position and never finds
