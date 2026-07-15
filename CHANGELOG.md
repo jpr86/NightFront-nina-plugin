@@ -1,6 +1,12 @@
 ﻿# NightFront
 
 ## Unreleased
+- Fixed CenterAfterDriftTrigger centering on RA 0/Dec 0 for the whole night when placed outside
+  the NightFront Container (the production template's own layout, on "Loop while safe") - NINA's
+  built-in coordinate inheritance only looks upward from the trigger's own position and never finds
+  a target nested below the container. A new NightFrontCenterAfterDriftCoordinator now actively
+  pushes each target's live coordinates into any such trigger the moment NINA starts running it,
+  mirroring how tcpalmer/nina.plugin.targetscheduler solves the same problem for its own container.
 
 ## 1.2.1.0
 - Version-only bump to align with NightFront app v1.2.1 (Long Range Planning effort-preset
