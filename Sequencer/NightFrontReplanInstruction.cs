@@ -309,6 +309,14 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
 
                 container.PopulateItems(imported);
 
+                // Repopulating discards every previously-imported DeepSkyObjectContainer, so any
+                // NightFrontCenterAfterDriftCoordinator subscribed to the old ones (from tonight's
+                // original NightFrontUpdateInstruction run) is now watching objects that will never
+                // run again - a fresh one must be attached to the new plan's targets, or a
+                // CenterAfterDriftTrigger placed outside the container silently stops tracking the
+                // active target for the rest of the night. See that class's own doc comment.
+                new NightFrontCenterAfterDriftCoordinator(container, imported);
+
                 ArchivePreviousPlanFileIfPresent(folder, finalOutputPath, now);
 
                 try {

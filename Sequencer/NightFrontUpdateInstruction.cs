@@ -216,6 +216,12 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
 
                 new NightFrontMetadataRecorder(imported, rotatorMediator, Path.GetFileName(matchedFile), livePath);
 
+                // See NightFrontCenterAfterDriftCoordinator's own doc comment: a CenterAfterDriftTrigger
+                // placed outside the NightFront Container (the maintainer's own production template
+                // does this) can't resolve its target coordinates through NINA's built-in inheritance,
+                // since every imported DeepSkyObjectContainer lives below the container, not above it.
+                new NightFrontCenterAfterDriftCoordinator(container, imported);
+
                 Notification.ShowSuccess($"NightFront: imported plan for {todayToken} ({imported.Count} target(s)).");
             } catch (OperationCanceledException) {
                 // A user-initiated sequence stop, not an import failure - leave the status indicator
