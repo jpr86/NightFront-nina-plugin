@@ -68,8 +68,14 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
         /// one actually loaded, silently replanning the wrong night. Remembering the exact source
         /// filename at population time sidesteps that ambiguity entirely. Null until PopulateItems is
         /// first called with a non-null name (e.g. a container freshly dragged into the editor, never
-        /// yet populated).
+        /// yet populated). [JsonProperty] is required, not decorative: this class is
+        /// [JsonObject(MemberSerialization.OptIn)], and the base SequenceContainer's Items already
+        /// survives NINA's own sequence save/reload that way - without this attribute, reloading a
+        /// saved sequence would bring Items back intact but silently reset this to null, reopening the
+        /// exact after-midnight ambiguity above the moment a Replan next ran against the reloaded
+        /// container.
         /// </summary>
+        [JsonProperty]
         public string SourcePlanFileName { get; private set; }
 
         /// <summary>

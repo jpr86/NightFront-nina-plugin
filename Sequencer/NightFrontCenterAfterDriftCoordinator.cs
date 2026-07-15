@@ -6,6 +6,7 @@ using NINA.Sequencer.Trigger;
 using NINA.Sequencer.Trigger.Platesolving;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Windows;
 
 namespace JeffRidder.NINA.Nightfront.Sequencer {
 
@@ -43,25 +44,11 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
 
         public NightFrontCenterAfterDriftCoordinator(NightFrontContainer container, IEnumerable<ISequenceItem> importedTopLevelItems) {
             this.container = container;
-            foreach (var item in importedTopLevelItems) {
-                AttachTargets(item);
-            }
-        }
-
-        private void AttachTargets(ISequenceItem item) {
-            if (item is DeepSkyObjectContainer dso) {
-                AttachTarget(dso);
-            }
-
-            if (item is ISequenceContainer nested) {
-                foreach (var child in nested.Items) {
-                    AttachTargets(child);
-                }
-            }
+            NightFrontSequenceTreeWalker.ForEachDeepSkyObjectContainer(importedTopLevelItems, AttachTarget);
         }
 
         private void AttachTarget(DeepSkyObjectContainer dso) {
-            var centerAndRotate = FindCenterAndRotate(dso);
+            var centerAndRotate = NightFrontSequenceTreeWalker.FindCenterAndRotate(dso);
             if (centerAndRotate == null) {
                 return;
             }
@@ -77,7 +64,26 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
             centerAndRotate.PropertyChanged += handler;
         }
 
+        /// <summary>
+        /// NINA executes sequence items (and so raises this class's own CenterAndRotate.Status
+        /// PropertyChanged trigger) off the UI thread, but Coordinates/Inherited on a
+        /// CenterAfterDriftTrigger sitting in a live sequencer editor can be data-bound - the same
+        /// reason NightFrontUpdateInstruction/NightFrontReplanInstruction wrap their own
+        /// status/message property updates in a UI-thread dispatch, and NightFrontContainer.
+        /// RebuildTargetSummaries does the same for its own UI-bound collection. Without this,
+        /// setting trigger.Inherited from a background thread while the sequencer editor is open and
+        /// showing that trigger's live state could throw a WPF cross-thread InvalidOperationException.
+        /// </summary>
         private void PushCoordinates(DeepSkyObjectContainer dso) {
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher != null && !dispatcher.CheckAccess()) {
+                dispatcher.Invoke(() => PushCoordinatesOnCurrentThread(dso));
+            } else {
+                PushCoordinatesOnCurrentThread(dso);
+            }
+        }
+
+        private void PushCoordinatesOnCurrentThread(DeepSkyObjectContainer dso) {
             var trigger = FindCenterAfterDriftTrigger();
             if (trigger == null || dso.Target?.InputCoordinates == null) {
                 return;
@@ -105,21 +111,6 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                     }
                 }
                 ancestor = ancestor.Parent;
-            }
-            return null;
-        }
-
-        private static CenterAndRotate FindCenterAndRotate(ISequenceContainer container) {
-            foreach (var item in container.Items) {
-                if (item is CenterAndRotate centerAndRotate) {
-                    return centerAndRotate;
-                }
-                if (item is ISequenceContainer nested) {
-                    var found = FindCenterAndRotate(nested);
-                    if (found != null) {
-                        return found;
-                    }
-                }
             }
             return null;
         }

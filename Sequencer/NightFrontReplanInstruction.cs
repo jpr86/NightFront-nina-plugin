@@ -96,6 +96,7 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
         private readonly NightFrontJsonImporter importer;
         private readonly ISafetyMonitorMediator safetyMonitorMediator;
         private readonly IWeatherDataMediator weatherDataMediator;
+        private readonly IRotatorMediator rotatorMediator;
 
         [ImportingConstructor]
         public NightFrontReplanInstruction(
@@ -145,17 +146,19 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                     planetariumFactory,
                     dateTimeProviders),
                 safetyMonitorMediator,
-                weatherDataMediator) {
+                weatherDataMediator,
+                rotatorMediator) {
         }
 
-        private NightFrontReplanInstruction(IProfileService profileService, NightFrontJsonImporter importer, ISafetyMonitorMediator safetyMonitorMediator, IWeatherDataMediator weatherDataMediator) {
+        private NightFrontReplanInstruction(IProfileService profileService, NightFrontJsonImporter importer, ISafetyMonitorMediator safetyMonitorMediator, IWeatherDataMediator weatherDataMediator, IRotatorMediator rotatorMediator) {
             this.profileService = profileService;
             this.importer = importer;
             this.safetyMonitorMediator = safetyMonitorMediator;
             this.weatherDataMediator = weatherDataMediator;
+            this.rotatorMediator = rotatorMediator;
         }
 
-        private NightFrontReplanInstruction(NightFrontReplanInstruction copyMe) : this(copyMe.profileService, copyMe.importer, copyMe.safetyMonitorMediator, copyMe.weatherDataMediator) {
+        private NightFrontReplanInstruction(NightFrontReplanInstruction copyMe) : this(copyMe.profileService, copyMe.importer, copyMe.safetyMonitorMediator, copyMe.weatherDataMediator, copyMe.rotatorMediator) {
             CopyMetaData(copyMe);
         }
 
@@ -332,13 +335,22 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                 // continues to target that same freshly-minted name instead of re-deriving a new one.
                 container.PopulateItems(imported, Path.GetFileName(finalOutputPath));
 
-                // Repopulating discards every previously-imported DeepSkyObjectContainer, so any
-                // NightFrontCenterAfterDriftCoordinator subscribed to the old ones (from tonight's
-                // original NightFrontUpdateInstruction run) is now watching objects that will never
-                // run again - a fresh one must be attached to the new plan's targets, or a
-                // CenterAfterDriftTrigger placed outside the container silently stops tracking the
-                // active target for the rest of the night. See that class's own doc comment.
+                // Repopulating discards every previously-imported DeepSkyObjectContainer, so anything
+                // subscribed to the old ones (from tonight's original NightFrontUpdateInstruction run,
+                // or an earlier replan) is now watching objects that will never run again - both of
+                // the following must be freshly attached to the new plan's targets, or they silently
+                // stop doing their job for the rest of the night. See each class's own doc comment.
                 new NightFrontCenterAfterDriftCoordinator(container, imported);
+
+                // Same base-name derivation NightFrontUpdateInstruction uses, so the accumulating
+                // *.metadata.json file stays the same one across a replan rather than starting a
+                // second, disconnected file. Uses finalOutputPath (always non-null here) rather than
+                // matchedFile (which can be null the first time Replan ever runs in a session with no
+                // prior NightFrontUpdateInstruction), so the metadata recorder gets constructed either
+                // way.
+                var metadataBaseName = NightFrontMetadataPaths.DeriveStableBaseName(Path.GetFileNameWithoutExtension(finalOutputPath), todayToken);
+                var livePath = NightFrontMetadataPaths.GetLiveMetadataPath(folder, metadataBaseName);
+                new NightFrontMetadataRecorder(imported, rotatorMediator, Path.GetFileName(finalOutputPath), livePath);
 
                 ArchivePreviousPlanFileIfPresent(folder, finalOutputPath, now);
 

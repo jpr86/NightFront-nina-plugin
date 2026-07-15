@@ -1,3 +1,4 @@
+using JeffRidder.NINA.Nightfront.Sequencer;
 using NINA.Core.Enum;
 using NINA.Core.Utility.Notification;
 using NINA.Equipment.Interfaces.Mediator;
@@ -39,27 +40,13 @@ namespace JeffRidder.NINA.Nightfront.Import {
             this.sourcePlanFileName = sourcePlanFileName;
             this.livePath = livePath;
 
-            foreach (var item in importedTopLevelItems) {
-                AttachTargets(item);
-            }
-        }
-
-        private void AttachTargets(ISequenceItem item) {
-            if (item is DeepSkyObjectContainer dso) {
-                AttachTarget(dso);
-            }
-
-            if (item is ISequenceContainer container) {
-                foreach (var child in container.Items) {
-                    AttachTargets(child);
-                }
-            }
+            NightFrontSequenceTreeWalker.ForEachDeepSkyObjectContainer(importedTopLevelItems, AttachTarget);
         }
 
         private void AttachTarget(DeepSkyObjectContainer dso) {
             var name = string.IsNullOrWhiteSpace(dso.Target?.TargetName) ? dso.Name : dso.Target.TargetName;
 
-            var centerAndRotate = FindCenterAndRotate(dso);
+            var centerAndRotate = NightFrontSequenceTreeWalker.FindCenterAndRotate(dso);
             if (centerAndRotate == null) {
                 return;
             }
@@ -129,19 +116,5 @@ namespace JeffRidder.NINA.Nightfront.Import {
             }
         }
 
-        private static CenterAndRotate FindCenterAndRotate(ISequenceContainer container) {
-            foreach (var item in container.Items) {
-                if (item is CenterAndRotate centerAndRotate) {
-                    return centerAndRotate;
-                }
-                if (item is ISequenceContainer nested) {
-                    var found = FindCenterAndRotate(nested);
-                    if (found != null) {
-                        return found;
-                    }
-                }
-            }
-            return null;
-        }
     }
 }

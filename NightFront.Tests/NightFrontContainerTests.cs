@@ -1,5 +1,6 @@
 using JeffRidder.NINA.Nightfront.Sequencer;
 using Moq;
+using Newtonsoft.Json;
 using NINA.Astrometry;
 using NINA.Astrometry.Interfaces;
 using NINA.Core.Enum;
@@ -98,6 +99,23 @@ namespace JeffRidder.NINA.Nightfront.Tests {
             var clone = (NightFrontContainer)container.Clone();
 
             Assert.Equal("TargetsForTonight_2026-07-14.json", clone.SourcePlanFileName);
+        }
+
+        [Fact]
+        public void SourcePlanFileName_IsMarkedJsonPropertySoItSurvivesASequenceSaveReload() {
+            // NightFrontContainer is [JsonObject(MemberSerialization.OptIn)], so a property with no
+            // [JsonProperty] attribute is silently dropped whenever NINA saves/reloads a sequence -
+            // Items (the base SequenceContainer property) already survives that round-trip, so
+            // without this attribute a reload would bring targets back but silently reset
+            // SourcePlanFileName to null, reopening the exact after-midnight ambiguity it exists to
+            // prevent. Regression guard via reflection rather than a full NINA JSON round-trip,
+            // which this test project has no harness for.
+            var property = typeof(NightFrontContainer).GetProperty(nameof(NightFrontContainer.SourcePlanFileName));
+
+            Assert.NotNull(property);
+            Assert.True(
+                property.GetCustomAttributes(typeof(JsonPropertyAttribute), inherit: false).Length > 0,
+                "SourcePlanFileName must carry [JsonProperty] to survive a saved sequence's reload.");
         }
 
         [Fact]
