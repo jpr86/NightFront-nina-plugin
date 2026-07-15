@@ -194,7 +194,7 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                     throw new NightFrontImportException("Nightly Update could not find a following NightFront Container.");
                 }
 
-                container.PopulateItems(imported);
+                container.PopulateItems(imported, Path.GetFileName(matchedFile));
 
                 LastRunSucceeded = true;
                 StatusMessage = $"Plan retrieved from file: {Path.GetFileName(matchedFile)}";

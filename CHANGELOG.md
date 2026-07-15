@@ -8,12 +8,14 @@
   pushes each target's live coordinates into any such trigger the moment NINA starts running it,
   mirroring how tcpalmer/nina.plugin.targetscheduler solves the same problem for its own container.
 - Fixed Replan naming its output with the current calendar date instead of the date of the plan it's
-  replacing, when run after local midnight. The night's plan filename is fixed at whatever date it
-  was originally exported/last replanned on; a today-only lookup found nothing once "today" rolled
-  over, so Replan spawned a brand-new, wrongly-dated plan file alongside the real one instead of
-  continuing to update it. NightFrontMetadataPaths.FindMostRecentPlanFile now backs up
-  FindTodaysPlanFile so Replan's output (and the progress-snapshot/replan-history names derived from
-  it) always matches the plan actually being replaced.
+  replacing, when run after local midnight. NightFrontApp routinely exports several nights' plan
+  files at once, so a date-based folder lookup for "today's plan" doesn't just fail after midnight -
+  it can wrongly match a *later* night's already-exported file, since that file's date now matches
+  "today" just as validly. NightFrontContainer now remembers the exact file name
+  (SourcePlanFileName) it was actually populated from at import/replan time, and Replan uses that
+  directly instead of re-deriving it from the folder, so its output (and the
+  progress-snapshot/replan-history names derived from it) always matches the plan it's actually
+  replacing, keeping that same name across every replan of the same night.
 
 ## 1.2.1.0
 - Version-only bump to align with NightFront app v1.2.1 (Long Range Planning effort-preset

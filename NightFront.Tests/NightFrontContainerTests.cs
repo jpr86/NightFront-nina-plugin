@@ -41,6 +41,65 @@ namespace JeffRidder.NINA.Nightfront.Tests {
             Assert.Contains(typeof(ISequenceContainer), exportedContracts);
         }
 
+        // ── SourcePlanFileName / PopulateItems ──────────────────────────────────────────────
+
+        [Fact]
+        public void SourcePlanFileName_IsNullUntilFirstPopulated() {
+            var container = new NightFrontContainer();
+
+            Assert.Null(container.SourcePlanFileName);
+        }
+
+        [Fact]
+        public void PopulateItems_WithASourceName_SetsSourcePlanFileName() {
+            var container = new NightFrontContainer();
+
+            container.PopulateItems(new[] { Mock.Of<ISequenceItem>() }, "TargetsForTonight_2026-07-14.json");
+
+            Assert.Equal("TargetsForTonight_2026-07-14.json", container.SourcePlanFileName);
+        }
+
+        [Fact]
+        public void PopulateItems_ANullSourceName_LeavesSourcePlanFileNameUnchanged() {
+            // NightFrontReplanInstruction's "every target already complete" path empties the
+            // container without any new file actually replacing the one on disk - the remembered
+            // name must survive that call untouched.
+            var container = new NightFrontContainer();
+            container.PopulateItems(new[] { Mock.Of<ISequenceItem>() }, "TargetsForTonight_2026-07-14.json");
+
+            container.PopulateItems(System.Array.Empty<ISequenceItem>());
+
+            Assert.Equal("TargetsForTonight_2026-07-14.json", container.SourcePlanFileName);
+        }
+
+        [Fact]
+        public void PopulateItems_ASecondSourceName_OverwritesThePrevious() {
+            // A same-night replan repopulating the container from a freshly-written plan (kept
+            // under the same file name - see NightFrontReplanInstruction) should still go through
+            // this same update path even when the name doesn't actually change.
+            var container = new NightFrontContainer();
+            container.PopulateItems(new[] { Mock.Of<ISequenceItem>() }, "TargetsForTonight_2026-07-14.json");
+
+            container.PopulateItems(new[] { Mock.Of<ISequenceItem>() }, "TargetsForTonight_2026-07-15.json");
+
+            Assert.Equal("TargetsForTonight_2026-07-15.json", container.SourcePlanFileName);
+        }
+
+        [Fact]
+        public void Clone_PreservesSourcePlanFileName() {
+            // NightFrontContainer.Clone() clones every existing Item via item.Clone() - a loose
+            // Mock.Of<ISequenceItem>() would return null there and NPE inside NINA's own Add(), so
+            // this item needs a real (if minimal) Clone() stub.
+            var item = new Mock<ISequenceItem>();
+            item.Setup(i => i.Clone()).Returns(item.Object);
+            var container = new NightFrontContainer();
+            container.PopulateItems(new[] { item.Object }, "TargetsForTonight_2026-07-14.json");
+
+            var clone = (NightFrontContainer)container.Clone();
+
+            Assert.Equal("TargetsForTonight_2026-07-14.json", clone.SourcePlanFileName);
+        }
+
         [Fact]
         public void FindNext_ContainerImmediatelyAfter_ReturnsIt() {
             var after = Mock.Of<ISequenceItem>();

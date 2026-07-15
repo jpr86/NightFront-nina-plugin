@@ -58,18 +58,41 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
         public ObservableCollection<object> TargetSummaries { get; } = new ObservableCollection<object>();
 
         /// <summary>
-        /// Replaces the container's current children with <paramref name="newItems"/>. Called by
-        /// NightFrontUpdateInstruction once it has successfully imported a plan file. Each Remove/Add
-        /// below triggers a TargetSummaries rebuild via the CollectionChanged subscription set up in
-        /// the constructor - the same mechanism that keeps TargetSummaries in sync with manual
-        /// drag-reorder/delete done directly in the sequencer editor.
+        /// The file name (not full path) of the plan file this container's current Items were last
+        /// populated from - the authoritative "what plan is this, really" signal for
+        /// NightFrontReplanInstruction. NightFrontApp routinely exports several nights' plan files at
+        /// once (e.g. "TargetsForTonight_2026-07-14.json" through "...-07-16.json" sitting in the data
+        /// folder simultaneously), so re-deriving "the current plan" by scanning the folder for a
+        /// date-matching (or even just most-recently-written) file is unsound - after local midnight,
+        /// a date-based scan can just as easily match a *later* night's already-exported file as the
+        /// one actually loaded, silently replanning the wrong night. Remembering the exact source
+        /// filename at population time sidesteps that ambiguity entirely. Null until PopulateItems is
+        /// first called with a non-null name (e.g. a container freshly dragged into the editor, never
+        /// yet populated).
         /// </summary>
-        public void PopulateItems(IEnumerable<ISequenceItem> newItems) {
+        public string SourcePlanFileName { get; private set; }
+
+        /// <summary>
+        /// Replaces the container's current children with <paramref name="newItems"/>. Called by
+        /// NightFrontUpdateInstruction (the nightly import) and NightFrontReplanInstruction (a
+        /// mid-night replan) once either has successfully imported a plan file. Each Remove/Add below
+        /// triggers a TargetSummaries rebuild via the CollectionChanged subscription set up in the
+        /// constructor - the same mechanism that keeps TargetSummaries in sync with manual
+        /// drag-reorder/delete done directly in the sequencer editor. <paramref
+        /// name="sourcePlanFileName"/> updates <see cref="SourcePlanFileName"/> when given; passing
+        /// null leaves it unchanged - used by NightFrontReplanInstruction's "every target already
+        /// complete" path, which empties the container without any new file actually replacing the
+        /// one on disk, so the remembered name shouldn't change either.
+        /// </summary>
+        public void PopulateItems(IEnumerable<ISequenceItem> newItems, string sourcePlanFileName = null) {
             foreach (var existing in Items.ToList()) {
                 Remove(existing);
             }
             foreach (var item in newItems) {
                 Add(item);
+            }
+            if (sourcePlanFileName != null) {
+                SourcePlanFileName = sourcePlanFileName;
             }
         }
 
@@ -240,7 +263,9 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
         }
 
         public override object Clone() {
-            var clone = new NightFrontContainer(this);
+            var clone = new NightFrontContainer(this) {
+                SourcePlanFileName = SourcePlanFileName
+            };
             foreach (var item in Items) {
                 clone.Add((ISequenceItem)item.Clone());
             }

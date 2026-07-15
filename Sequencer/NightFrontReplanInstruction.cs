@@ -252,17 +252,22 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                 progress?.Report(new ApplicationStatus { Status = "NightFront: reading tonight's progress" });
 
                 var snapshot = container.BuildProgressSnapshot();
-                // FindTodaysPlanFile alone breaks for a replan that runs after local midnight: the
-                // night's plan file is still named for whatever date it was exported/last replanned
-                // on, not "today" in the replan's own now-later calendar sense, so a plain today-only
-                // lookup would find nothing and this replan would spawn a brand-new, wrongly-dated
-                // plan file alongside the real one instead of continuing to update it (a real reported
-                // bug - confirmed live from an actual replanned-after-midnight plan/replan-history
-                // pair). FindMostRecentPlanFile's fallback (no date filter, just "whichever plan file
-                // is actually here") keeps this replan's output - and every filename derived from it
-                // below - matching the plan it's replacing.
-                var matchedFile = NightFrontMetadataPaths.FindTodaysPlanFile(folder, now)
-                    ?? NightFrontMetadataPaths.FindMostRecentPlanFile(folder);
+                // NightFrontApp routinely exports several nights' plan files at once (e.g.
+                // "TargetsForTonight_2026-07-14.json" through "...-07-16.json" sitting in the data
+                // folder together), so re-deriving "the current plan" from the folder by date - even
+                // falling back to "whichever plan file is most recent" - is unsound: a replan running
+                // after local midnight has a "today" that matches a *later* night's already-exported
+                // file just as validly as it fails to match tonight's actual (earlier-dated) one, and
+                // "most recently written" can't tell those apart either, since a multi-night export
+                // writes all of them at once. container.SourcePlanFileName instead remembers the
+                // exact file NightFrontUpdateInstruction (or an earlier replan this same night)
+                // actually populated the container from - see that property's own doc comment -
+                // which is unambiguous regardless of what other dated siblings exist. Only falls back
+                // to a folder scan if the container was somehow never populated this session at all
+                // (e.g. Replan added without Nightly Update ever having run).
+                var matchedFile = !string.IsNullOrEmpty(container.SourcePlanFileName)
+                    ? Path.Combine(folder, container.SourcePlanFileName)
+                    : NightFrontMetadataPaths.FindTodaysPlanFile(folder, now);
                 var progressBaseName = matchedFile != null
                     ? Path.GetFileNameWithoutExtension(matchedFile)
                     : $"TargetsForTonight_{todayToken}";
@@ -319,7 +324,13 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                 var json = await File.ReadAllTextAsync(cliOutputPath, token);
                 var imported = importer.Import(json);
 
-                container.PopulateItems(imported);
+                // Explicitly re-asserts SourcePlanFileName to finalOutputPath's own name - normally a
+                // no-op (matchedFile, and so finalOutputPath, was derived FROM SourcePlanFileName
+                // above), but keeps it correctly pinned in the fallback case where the container had
+                // no SourcePlanFileName yet and finalOutputPath was freshly minted with today's date -
+                // so a *second* replan later this same night (still with SourcePlanFileName now set)
+                // continues to target that same freshly-minted name instead of re-deriving a new one.
+                container.PopulateItems(imported, Path.GetFileName(finalOutputPath));
 
                 // Repopulating discards every previously-imported DeepSkyObjectContainer, so any
                 // NightFrontCenterAfterDriftCoordinator subscribed to the old ones (from tonight's
