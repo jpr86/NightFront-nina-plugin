@@ -73,6 +73,30 @@ namespace JeffRidder.NINA.Nightfront.Import {
                 .FirstOrDefault(f => Path.GetFileName(f).Contains(todayToken));
         }
 
+        /// <summary>
+        /// Finds the plan JSON file in <paramref name="folder"/> most recently written to, with no
+        /// date-token match required - the same sidecar exclusions as <see cref="FindTodaysPlanFile"/>,
+        /// just without its "name contains today's date" filter. A replan that runs after local
+        /// midnight has a "today" that no longer matches the date baked into the night's own plan
+        /// filename - that filename is fixed at whatever date NightFrontApp's exporter (or an earlier
+        /// same-night replan) last wrote, not the date the replan itself happens to run on - so
+        /// FindTodaysPlanFile alone would find nothing and a caller would wrongly conclude no plan
+        /// exists yet. Callers that want "the plan currently in effect regardless of what today's date
+        /// is" (see NightFrontReplanInstruction) should try FindTodaysPlanFile first (the common,
+        /// cheap, unambiguous case) and fall back to this only when that returns null. Returns null if
+        /// the folder is unset/missing or no candidate file exists.
+        /// </summary>
+        public static string FindMostRecentPlanFile(string folder) {
+            if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder)) {
+                return null;
+            }
+
+            return Directory.EnumerateFiles(folder, "*.json")
+                .Where(f => !IsMetadataFile(f) && !IsProgressSnapshotFile(f) && !IsSelectionPreferenceFile(f) && !IsSessionConfigFile(f))
+                .OrderByDescending(File.GetLastWriteTimeUtc)
+                .FirstOrDefault();
+        }
+
         /// <summary>Builds the progress-snapshot path for <paramref name="baseName"/> (typically the
         /// same date-stamped base name as the plan file it was captured from - see
         /// NightFrontJsonImporter/NightFrontUpdateInstruction). Intended as the one place a future

@@ -252,7 +252,17 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                 progress?.Report(new ApplicationStatus { Status = "NightFront: reading tonight's progress" });
 
                 var snapshot = container.BuildProgressSnapshot();
-                var matchedFile = NightFrontMetadataPaths.FindTodaysPlanFile(folder, now);
+                // FindTodaysPlanFile alone breaks for a replan that runs after local midnight: the
+                // night's plan file is still named for whatever date it was exported/last replanned
+                // on, not "today" in the replan's own now-later calendar sense, so a plain today-only
+                // lookup would find nothing and this replan would spawn a brand-new, wrongly-dated
+                // plan file alongside the real one instead of continuing to update it (a real reported
+                // bug - confirmed live from an actual replanned-after-midnight plan/replan-history
+                // pair). FindMostRecentPlanFile's fallback (no date filter, just "whichever plan file
+                // is actually here") keeps this replan's output - and every filename derived from it
+                // below - matching the plan it's replacing.
+                var matchedFile = NightFrontMetadataPaths.FindTodaysPlanFile(folder, now)
+                    ?? NightFrontMetadataPaths.FindMostRecentPlanFile(folder);
                 var progressBaseName = matchedFile != null
                     ? Path.GetFileNameWithoutExtension(matchedFile)
                     : $"TargetsForTonight_{todayToken}";
@@ -268,7 +278,9 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                 // would look for - but NOT what the CLI is told to write to directly (see cliOutputPath
                 // below): this path routinely already exists on disk (it's tonight's already-imported
                 // plan), so its mere existence after the CLI runs can't distinguish "the CLI wrote a
-                // fresh plan" from "the CLI wrote nothing and this is what was already here."
+                // fresh plan" from "the CLI wrote nothing and this is what was already here." Only
+                // falls back to a today-dated brand-new name when matchedFile is null - meaning no
+                // plan file exists anywhere in the folder at all, not even an older-dated one.
                 var finalOutputPath = matchedFile ?? Path.Combine(folder, $"TargetsForTonight_{todayToken}.json");
 
                 // A GUID-suffixed path that could not possibly have existed before this specific
