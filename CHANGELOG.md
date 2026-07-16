@@ -1,5 +1,25 @@
 ﻿# NightFront
 
+## 1.3.1.0
+- Aligns with NightFront app v1.3.1. Unlike the version-only bumps below, this one does change
+  plugin behavior, even though no C# changed: the `nightfront-cli.exe` deployed alongside this
+  plugin is what Replan shells out to, and its Astrospheric usage was cut substantially.
+- Replan is much cheaper to run repeatedly. Every Replan used to buy its own full Astrospheric
+  forecast (80 API credits), because each run is a separate process with nothing shared between
+  them - so a night that flapped unsafe/safe repeatedly paid for the same forecast over and over,
+  unattended. The CLI now costs 65 credits (it no longer requests wind data, which nothing used)
+  and caches each site's forecast on disk for 6 hours, matching how often Astrospheric refreshes
+  the underlying model. In practice the first fetch of the night is the only one that costs
+  anything, and every later Replan reuses it.
+- This does not make Replan work off stale weather. The live cloud-cover reading this instruction
+  already sends from your weather driver (and the seeing value from a Seeing Trigger, if you have
+  one) still overrides the forecast for the hours around the replan - which is the window Replan
+  actually schedules into. Only the further-out hours come from the cached forecast.
+- Worth knowing if you were watching your credit balance: the NightFront app had long documented a
+  "100 credits/day" cap. That figure is from Astrospheric's v1 API and never applied - the app has
+  only ever called v2, which allows ~29,900 per month and refreshes on the 1st of the month, not
+  daily. A verified live call reads the true remaining balance into the CLI log.
+
 ## 1.3.0.0
 - Aligns with NightFront app v1.3.0, which puts pressure on completing Active targets in Long
   Range Planning (a new "Planned Target Weight" control, entirely on the app side). Unlike the
