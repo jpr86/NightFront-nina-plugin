@@ -73,34 +73,14 @@ namespace JeffRidder.NINA.Nightfront {
             }
         }
 
-        // GA compute-budget preset (Fast/Balanced/Thorough) for an unattended safety-recovery
-        // replan. The name is passed verbatim to the NightFront CLI as `replan --effort=<value>`,
-        // where it resolves to NightFront's own ReplanEffortPreset (optimizer/ReplanEffortPreset.kt)
-        // — a REPLAN-SPECIFIC preset family, deliberately much smaller than the GUI's EffortPreset
-        // (Fast here is pop 60 / gen 50, vs the GUI Fast's pop 100 / gen 200): a replan solves only
-        // the Active-target remainder of one night, a far cheaper problem, so even Thorough here
-        // stays smaller than the GUI's Fast. Read by NightFrontReplanInstruction
-        // (todos/nina-safety-delay-plan.md, Phase 3). Defaults to Fast: most machines NINA actually
-        // runs on overnight (a mini-PC or NUC bolted to the mount) are far less powerful than
-        // whatever desktop the plan's config was tuned on, and a replan runs unattended during a
-        // real weather interruption with no one watching a progress bar to justify a slower solve. A
-        // user with a genuinely capable imaging PC can opt into Balanced or Thorough here.
-        // Must be an instance property, not a static field — WPF's {Binding ReplanEffortLevelOptions}
-        // resolves via TypeDescriptor.GetProperties(DataContext), which only sees instance
-        // properties, not static members. A static field silently binds to nothing (empty
-        // ItemsSource), which is why the options-tab dropdown showed blank rather than erroring.
-        public string[] ReplanEffortLevelOptions => new[] { "Fast", "Balanced", "Thorough" };
-
-        public string ReplanEffortLevel {
-            get {
-                return Settings.Default.ReplanEffortLevel;
-            }
-            set {
-                Settings.Default.ReplanEffortLevel = value;
-                CoreUtil.SaveSettings(Settings.Default);
-                RaisePropertyChanged();
-            }
-        }
+        // The GA compute-budget preset for an unattended safety-recovery replan is no longer a
+        // user-facing setting: NightFrontReplanInstruction hardcodes it (ReplanEffortLevel = "Fast")
+        // and passes it verbatim to the NightFront CLI as `replan --effort=Fast`, where it resolves
+        // to the replan-specific ReplanEffortPreset family (optimizer/ReplanEffortPreset.kt). That
+        // family was already fine-tuned by sweep so Fast is the right unattended budget for the
+        // modest imaging-PC hardware NINA runs on overnight; the former Options-tab dropdown only
+        // threatened to undo that tuning, so it (and the Settings.Default.ReplanEffortLevel setting
+        // behind it) was removed.
 
         // Optional manual override for the NightFront CLI path - not exposed in the Options UI.
         // NightFrontReplanInstruction now finds nightfront-cli.exe automatically, co-located with

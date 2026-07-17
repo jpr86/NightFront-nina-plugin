@@ -92,6 +92,14 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
         /// bounding how long a stuck/hung subprocess can block sequence recovery.</summary>
         public const int ReplanTimeoutSeconds = 300;
 
+        /// <summary>Effort preset passed to the NightFront CLI as `--effort=<value>` for every
+        /// replan. Hardcoded to "Fast" (no longer a user-facing Options-tab dropdown) because the
+        /// replan-specific ReplanEffortPreset family (NightFront's optimizer/ReplanEffortPreset.kt)
+        /// was already fine-tuned by sweep so that its Fast tier is the right unattended budget for
+        /// the modest imaging-PC hardware NINA runs on overnight — a user-overridable dropdown only
+        /// threatened to undo that tuning. See CLAUDE.md and the plan doc's Phase 2 notes.</summary>
+        public const string ReplanEffortLevel = "Fast";
+
         private readonly IProfileService profileService;
         private readonly NightFrontJsonImporter importer;
         private readonly ISafetyMonitorMediator safetyMonitorMediator;
@@ -300,7 +308,7 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                 var cliOutputPath = BuildCliOutputPath(folder, finalOutputPath);
 
                 var arguments = BuildReplanArguments(
-                    Settings.Default.ReplanEffortLevel, configPath, progressPath, weatherArg, cliOutputPath, selectionArg);
+                    ReplanEffortLevel, configPath, progressPath, weatherArg, cliOutputPath, selectionArg);
 
                 progress?.Report(new ApplicationStatus { Status = "NightFront: replanning the remainder of the night" });
                 var (exitCode, stdOut, stdErr) = await RunNightFrontCli(cliPath, arguments, token);

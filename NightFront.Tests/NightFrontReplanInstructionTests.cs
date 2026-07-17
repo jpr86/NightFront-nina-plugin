@@ -66,10 +66,11 @@ namespace JeffRidder.NINA.Nightfront.Tests {
 
         [Fact]
         public void BuildReplanArguments_EffortLevelIsPassedThroughVerbatimAsAnEffortFlag() {
-            // NightFront's own EffortPreset.parse() is case-insensitive and matches by name or
-            // label, so this instruction doesn't need to normalize casing itself - whatever the
-            // ReplanEffortLevel setting holds ("Fast"/"Balanced"/"Thorough") is passed straight
-            // through.
+            // NightFront's own ReplanEffortPreset.parse() is case-insensitive and matches by name
+            // or label, so this pure helper doesn't need to normalize casing itself - whatever
+            // effort string it's handed is passed straight through as --effort=<value>. (The live
+            // call site now always hands it the hardcoded NightFrontReplanInstruction.ReplanEffortLevel
+            // constant "Fast"; this test still exercises the passthrough for any value.)
             var args = NightFrontReplanInstruction.BuildReplanArguments(
                 "Thorough", "c", "p", "none", "o", null);
 

@@ -71,17 +71,6 @@ namespace JeffRidder.NINA.Nightfront.Properties {
             }
         }
 
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("Fast")]
-        public string ReplanEffortLevel {
-            get {
-                return ((string)(this["ReplanEffortLevel"]));
-            }
-            set {
-                this["ReplanEffortLevel"] = value;
-            }
-        }
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
