@@ -1,5 +1,34 @@
 ﻿# NightFront
 
+## 1.3.4.0
+- Aligns with NightFront app v1.3.4. Like 1.3.1.0 - and unlike the version-only bumps below - no
+  C# changed, but the `nightfront-cli.exe` deployed alongside this plugin (what Replan shells out
+  to) did, so Replan behaves differently this release.
+- Replan is now much faster on typical imaging hardware. The "Replan Effort Level" option
+  (Fast/Balanced/Thorough) used to map to the desktop app's full GA effort presets - the same
+  compute budget used to plan a whole multi-night roadmap. A replan only re-solves the remainder
+  of one night, so those budgets were far larger than needed. The CLI now resolves these same three
+  names against a dedicated, much smaller replan preset family: the default "Fast" drops from
+  pop 100 / gen 200 to pop 60 / gen 50 (roughly a 2-second solve on a modest overnight PC), and
+  even "Thorough" is now smaller than the old "Fast." If you'd picked Balanced or Thorough, you get
+  the new replan-scaled tier with no plugin edit.
+- Fixed Replan being able to schedule Planned (roadmap) targets into tonight's plan. The
+  `session-config.json` the app exports carries your whole roadmap, Planned targets included, and
+  those default to enabled - so the CLI's replan path was considering them as candidates even
+  though the desktop app's nightly plan correctly excludes anything not marked Active. Replan now
+  filters to enabled Active targets only, matching the nightly plan.
+
+## 1.3.3.0
+- Version-only bump to align with NightFront app v1.3.3 (a re-sweep of the desktop app's GA
+  effort-preset values after the to-do #6/#7 changes, entirely on the app side). No plugin-side
+  functional change this release - in particular, this did not touch the separate, smaller replan
+  effort presets that Replan uses.
+
+## 1.3.2.0
+- Version-only bump to align with NightFront app v1.3.2 (Planned/Accepted/Remaining sub-frame
+  tracking, completion-% influence on scheduling, AstroPM import fixes, and assorted GUI changes,
+  entirely on the app side). No plugin-side functional change this release.
+
 ## 1.3.1.0
 - Aligns with NightFront app v1.3.1. Unlike the version-only bumps below, this one does change
   plugin behavior, even though no C# changed: the `nightfront-cli.exe` deployed alongside this
