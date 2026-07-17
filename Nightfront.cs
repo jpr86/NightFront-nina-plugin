@@ -73,15 +73,18 @@ namespace JeffRidder.NINA.Nightfront {
             }
         }
 
-        // GA compute-budget preset (Fast/Balanced/Thorough - matching NightFront's own EffortPreset,
-        // optimizer/EffortPreset.kt) for an unattended safety-recovery replan. Read by
-        // NightFrontReplanInstruction (todos/nina-safety-delay-plan.md, Phase 3) and passed straight
-        // through to the NightFront CLI as `replan --effort=<value>`. Defaults to Fast: most machines
-        // NINA actually runs on overnight (a mini-PC or NUC bolted to the mount) are far less
-        // powerful than whatever desktop the plan's config was tuned on, and a replan runs
-        // unattended during a real weather interruption with no one watching a progress bar to
-        // justify a slower solve. A user with a genuinely capable imaging PC can opt into Balanced
-        // or Thorough here.
+        // GA compute-budget preset (Fast/Balanced/Thorough) for an unattended safety-recovery
+        // replan. The name is passed verbatim to the NightFront CLI as `replan --effort=<value>`,
+        // where it resolves to NightFront's own ReplanEffortPreset (optimizer/ReplanEffortPreset.kt)
+        // — a REPLAN-SPECIFIC preset family, deliberately much smaller than the GUI's EffortPreset
+        // (Fast here is pop 60 / gen 50, vs the GUI Fast's pop 100 / gen 200): a replan solves only
+        // the Active-target remainder of one night, a far cheaper problem, so even Thorough here
+        // stays smaller than the GUI's Fast. Read by NightFrontReplanInstruction
+        // (todos/nina-safety-delay-plan.md, Phase 3). Defaults to Fast: most machines NINA actually
+        // runs on overnight (a mini-PC or NUC bolted to the mount) are far less powerful than
+        // whatever desktop the plan's config was tuned on, and a replan runs unattended during a
+        // real weather interruption with no one watching a progress bar to justify a slower solve. A
+        // user with a genuinely capable imaging PC can opt into Balanced or Thorough here.
         // Must be an instance property, not a static field — WPF's {Binding ReplanEffortLevelOptions}
         // resolves via TypeDescriptor.GetProperties(DataContext), which only sees instance
         // properties, not static members. A static field silently binds to nothing (empty
