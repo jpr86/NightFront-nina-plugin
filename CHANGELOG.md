@@ -1,5 +1,10 @@
 ﻿# NightFront
 
+## 1.3.5.0
+- Version-only bump to align with NightFront app v1.3.5. The app change this release is GUI-only
+  (a moon-brightness bar added to the nightly-plan forecast display, plus code-review fixes to it),
+  so neither this plugin's C# nor the `nightfront-cli.exe` Replan shells out to changed behavior.
+
 ## 1.3.4.0
 - Aligns with NightFront app v1.3.4. Like 1.3.1.0 - and unlike the version-only bumps below - no
   C# changed, but the `nightfront-cli.exe` deployed alongside this plugin (what Replan shells out
