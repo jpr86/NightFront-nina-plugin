@@ -2,6 +2,7 @@ using JeffRidder.NINA.Nightfront.Import;
 using JeffRidder.NINA.Nightfront.Properties;
 using Newtonsoft.Json;
 using NINA.Core.Model;
+using NINA.Core.Utility.Notification;
 using NINA.Equipment.Interfaces.Mediator;
 using NINA.Sequencer.SequenceItem;
 using NINA.Sequencer.Validations;
@@ -35,13 +36,7 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
 
         private NightFrontRotateToNextAngleInstruction(NightFrontRotateToNextAngleInstruction copyMe) : this(copyMe.rotatorMediator) {
             CopyMetaData(copyMe);
-            BaseName = copyMe.BaseName;
         }
-
-        /// <summary>Which calibration-metadata file to read. Blank auto-detects the single
-        /// "*.metadata.json" file in the configured NightFront data folder.</summary>
-        [JsonProperty]
-        public string BaseName { get; set; } = "";
 
         public IList<string> Issues { get; set; } = new List<string>();
 
@@ -52,11 +47,10 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
             if (string.IsNullOrWhiteSpace(folder)) {
                 issues.Add("The NightFront data folder is not configured. Set it on the NightFront plugin's Options tab.");
             } else {
-                var resolvedBaseName = NightFrontMetadataPaths.ResolveBaseName(folder, BaseName, out var issue);
-                if (resolvedBaseName == null) {
+                var livePath = NightFrontMetadataPaths.ResolveExistingMetadataPath(folder, out var issue);
+                if (livePath == null) {
                     issues.Add(issue);
                 } else {
-                    var livePath = NightFrontMetadataPaths.GetLiveMetadataPath(folder, resolvedBaseName);
                     var filterOrder = NightFrontFilterOrder.Parse(Settings.Default.FlatFilterOrder);
                     if (NightFrontMetadataStore.PeekNext(livePath, filterOrder) == null) {
                         issues.Add("No calibration requirements remain in the NightFront calibration-metadata file.");
@@ -70,12 +64,14 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
 
         public override async Task Execute(IProgress<ApplicationStatus> progress, CancellationToken token) {
             var folder = Settings.Default.NightFrontDataFolder;
-            var resolvedBaseName = NightFrontMetadataPaths.ResolveBaseName(folder, BaseName, out var issue);
-            if (resolvedBaseName == null) {
-                throw new InvalidOperationException(issue);
+            var livePath = NightFrontMetadataPaths.ResolveExistingMetadataPath(folder, out var issue);
+            if (livePath == null) {
+                // No metadata file yet (e.g. no images collected) - exit quietly rather than failing
+                // the sequence. See NightFrontMetadataPaths.ResolveExistingMetadataPath.
+                Notification.ShowInformation($"NightFront: {issue}");
+                return;
             }
 
-            var livePath = NightFrontMetadataPaths.GetLiveMetadataPath(folder, resolvedBaseName);
             var filterOrder = NightFrontFilterOrder.Parse(Settings.Default.FlatFilterOrder);
             var entry = NightFrontMetadataStore.PeekNext(livePath, filterOrder)
                 ?? throw new InvalidOperationException("No calibration requirements remain in the NightFront calibration-metadata file.");
@@ -89,7 +85,7 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
         }
 
         public override string ToString() {
-            return $"Category: {Category}, Item: {nameof(NightFrontRotateToNextAngleInstruction)}, BaseName: {BaseName}";
+            return $"Category: {Category}, Item: {nameof(NightFrontRotateToNextAngleInstruction)}";
         }
     }
 }

@@ -62,13 +62,11 @@ namespace JeffRidder.NINA.Nightfront.Tests {
         [Fact]
         public void Clone_PreservesUserConfiguredProperties() {
             var instruction = CreateInstruction();
-            instruction.BaseName = "TargetsForTonight";
             instruction.Amount = 15;
 
             var clone = (NightFrontTrainedFlatsInstruction)instruction.Clone();
 
             Assert.NotSame(instruction, clone);
-            Assert.Equal("TargetsForTonight", clone.BaseName);
             Assert.Equal(15, clone.Amount);
             Assert.Equal(2, clone.Items.Count);
         }

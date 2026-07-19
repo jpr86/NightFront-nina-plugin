@@ -7,26 +7,23 @@ namespace JeffRidder.NINA.Nightfront.Tests {
 
     public class NightFrontMetadataPathsTests {
 
-        [Theory]
-        [InlineData("TargetsForTonight_2026-07-06", "2026-07-06", "TargetsForTonight")]
-        [InlineData("TargetsForTonight-2026-07-06", "2026-07-06", "TargetsForTonight")]
-        [InlineData("2026-07-06_TargetsForTonight", "2026-07-06", "TargetsForTonight")]
-        [InlineData("2026-07-06", "2026-07-06", "NightFront")]
-        [InlineData("SomePlan", "2026-07-06", "SomePlan")]
-        public void DeriveStableBaseName_StripsTokenAndAdjacentSeparator(string planFileBaseName, string todayToken, string expected) {
-            var result = NightFrontMetadataPaths.DeriveStableBaseName(planFileBaseName, todayToken);
-            Assert.Equal(expected, result);
+        [Fact]
+        public void GetLiveMetadataPath_IsAlwaysTheSameFixedUndatedFileName() {
+            var result = NightFrontMetadataPaths.GetLiveMetadataPath("C:\\NightFrontData");
+
+            Assert.Equal(Path.Combine("C:\\NightFrontData", "calibration.metadata.json"), result);
         }
 
         [Fact]
-        public void ResolveBaseName_ExplicitNameWinsVerbatim_EvenIfFolderHasOthers() {
+        public void ResolveExistingMetadataPath_FileExists_ReturnsItWithNoIssue() {
             var folder = CreateTempFolder();
             try {
-                File.WriteAllText(Path.Combine(folder, "Other.metadata.json"), "{}");
+                var path = Path.Combine(folder, "calibration.metadata.json");
+                File.WriteAllText(path, "{}");
 
-                var result = NightFrontMetadataPaths.ResolveBaseName(folder, "ExplicitName", out var issue);
+                var result = NightFrontMetadataPaths.ResolveExistingMetadataPath(folder, out var issue);
 
-                Assert.Equal("ExplicitName", result);
+                Assert.Equal(path, result);
                 Assert.Null(issue);
             } finally {
                 Directory.Delete(folder, recursive: true);
@@ -34,61 +31,39 @@ namespace JeffRidder.NINA.Nightfront.Tests {
         }
 
         [Fact]
-        public void ResolveBaseName_ExactlyOneMetadataFile_ResolvesAutomatically() {
+        public void ResolveExistingMetadataPath_FileAbsent_ReturnsNullWithIssue() {
             var folder = CreateTempFolder();
             try {
-                File.WriteAllText(Path.Combine(folder, "TargetsForTonight.metadata.json"), "{}");
-
-                var result = NightFrontMetadataPaths.ResolveBaseName(folder, "", out var issue);
-
-                Assert.Equal("TargetsForTonight", result);
-                Assert.Null(issue);
-            } finally {
-                Directory.Delete(folder, recursive: true);
-            }
-        }
-
-        [Fact]
-        public void ResolveBaseName_NoMetadataFiles_ReturnsNullWithIssue() {
-            var folder = CreateTempFolder();
-            try {
-                var result = NightFrontMetadataPaths.ResolveBaseName(folder, "", out var issue);
+                var result = NightFrontMetadataPaths.ResolveExistingMetadataPath(folder, out var issue);
 
                 Assert.Null(result);
                 Assert.NotNull(issue);
+                Assert.Contains("calibration.metadata.json", issue);
             } finally {
                 Directory.Delete(folder, recursive: true);
             }
         }
 
         [Fact]
-        public void ResolveBaseName_MultipleMetadataFiles_ReturnsNullWithIssueNamingCandidates() {
-            var folder = CreateTempFolder();
-            try {
-                File.WriteAllText(Path.Combine(folder, "TargetsForTonight.metadata.json"), "{}");
-                File.WriteAllText(Path.Combine(folder, "WinterProject.metadata.json"), "{}");
+        public void ResolveExistingMetadataPath_FolderMissing_ReturnsNullWithIssue() {
+            var result = NightFrontMetadataPaths.ResolveExistingMetadataPath(
+                Path.Combine(Path.GetTempPath(), "NightFrontTests_DoesNotExist_" + Guid.NewGuid()), out var issue);
 
-                var result = NightFrontMetadataPaths.ResolveBaseName(folder, "", out var issue);
-
-                Assert.Null(result);
-                Assert.Contains("TargetsForTonight", issue);
-                Assert.Contains("WinterProject", issue);
-            } finally {
-                Directory.Delete(folder, recursive: true);
-            }
+            Assert.Null(result);
+            Assert.NotNull(issue);
         }
 
         [Fact]
-        public void ResolveBaseName_IgnoresTheSharedArchiveFile() {
+        public void FindTodaysPlanFile_ExcludesTheFixedCalibrationMetadataFile() {
             var folder = CreateTempFolder();
             try {
-                File.WriteAllText(Path.Combine(folder, "TargetsForTonight.metadata.json"), "{}");
-                File.WriteAllText(Path.Combine(folder, "archived.metadata.json"), "{}");
+                var today = new DateTime(2026, 7, 6);
+                File.WriteAllText(Path.Combine(folder, "calibration.metadata.json"), "{}");
+                File.WriteAllText(Path.Combine(folder, "TargetsForTonight_2026-07-06.json"), "{}");
 
-                var result = NightFrontMetadataPaths.ResolveBaseName(folder, "", out var issue);
+                var result = NightFrontMetadataPaths.FindTodaysPlanFile(folder, today);
 
-                Assert.Equal("TargetsForTonight", result);
-                Assert.Null(issue);
+                Assert.Equal(Path.Combine(folder, "TargetsForTonight_2026-07-06.json"), result);
             } finally {
                 Directory.Delete(folder, recursive: true);
             }

@@ -350,14 +350,11 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                 // stop doing their job for the rest of the night. See each class's own doc comment.
                 new NightFrontCenterAfterDriftCoordinator(container, imported);
 
-                // Same base-name derivation NightFrontUpdateInstruction uses, so the accumulating
-                // *.metadata.json file stays the same one across a replan rather than starting a
-                // second, disconnected file. Uses finalOutputPath (always non-null here) rather than
-                // matchedFile (which can be null the first time Replan ever runs in a session with no
-                // prior NightFrontUpdateInstruction), so the metadata recorder gets constructed either
-                // way.
-                var metadataBaseName = NightFrontMetadataPaths.DeriveStableBaseName(Path.GetFileNameWithoutExtension(finalOutputPath), todayToken);
-                var livePath = NightFrontMetadataPaths.GetLiveMetadataPath(folder, metadataBaseName);
+                // The single fixed-name, undated metadata file NightFrontUpdateInstruction also writes,
+                // so a replan keeps accumulating into the same file rather than starting a second,
+                // disconnected one. (This is exactly the after-midnight forking bug the old
+                // date-derived name caused - see NightFrontMetadataPaths.)
+                var livePath = NightFrontMetadataPaths.GetLiveMetadataPath(folder);
                 new NightFrontMetadataRecorder(imported, rotatorMediator, Path.GetFileName(finalOutputPath), livePath);
 
                 ArchivePreviousPlanFileIfPresent(folder, finalOutputPath, now);

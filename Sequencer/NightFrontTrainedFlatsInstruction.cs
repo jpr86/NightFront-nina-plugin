@@ -61,7 +61,6 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
         private NightFrontTrainedFlatsInstruction(NightFrontTrainedFlatsInstruction copyMe)
             : this(copyMe.profileService, copyMe.cameraMediator, copyMe.imagingMediator, copyMe.imageSaveMediator, copyMe.imageHistoryVM, copyMe.filterWheelMediator, copyMe.rotatorMediator, copyMe.flatDeviceMediator) {
             CopyMetaData(copyMe);
-            BaseName = copyMe.BaseName;
             Amount = copyMe.Amount;
         }
 
@@ -78,7 +77,7 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
         }
 
         public override string ToString() {
-            return $"Category: {Category}, Item: {nameof(NightFrontTrainedFlatsInstruction)}, BaseName: {BaseName}";
+            return $"Category: {Category}, Item: {nameof(NightFrontTrainedFlatsInstruction)}";
         }
     }
 }

@@ -153,8 +153,7 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
         public double PollingIntervalMinutes { get; set; } = 5;
 
         /// <summary>Optional per-trigger override of the plugin-wide Settings.Default
-        /// .SeeingDataSourceUrl - blank auto-detects (uses the global option), same "blank
-        /// auto-detects" precedent as NightFrontWhileCalibrationRemainsCondition.BaseName.</summary>
+        /// .SeeingDataSourceUrl - blank uses the global option.</summary>
         [JsonProperty]
         public string DataSourceUrlOverride { get; set; } = "";
 

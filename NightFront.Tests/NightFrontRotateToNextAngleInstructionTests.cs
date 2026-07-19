@@ -28,7 +28,7 @@ namespace JeffRidder.NINA.Nightfront.Tests {
             var folder = CreateTempFolder();
             try {
                 Settings.Default.NightFrontDataFolder = folder;
-                var livePath = NightFrontMetadataPaths.GetLiveMetadataPath(folder, "TargetsForTonight");
+                var livePath = NightFrontMetadataPaths.GetLiveMetadataPath(folder);
                 NightFrontMetadataStore.TryAddCalibrationRequirement(livePath, "Ha", 90.6, -1, -1);
 
                 var rotatorMediator = new Mock<IRotatorMediator>();

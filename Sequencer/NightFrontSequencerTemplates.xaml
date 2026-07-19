@@ -177,20 +177,19 @@
         </mini:MiniSequenceItem>
     </DataTemplate>
 
-    <!--  Shared row showing which calibration-metadata file a NightFront calibration instruction/
-          condition will use - blank BaseName means it auto-detects the single metadata file in the
-          configured data folder, so the text reflects that rather than showing nothing.  -->
-    <DataTemplate x:Key="NightFrontBaseNameRow">
+    <!--  Shared row naming the single, fixed calibration-metadata file every NightFront calibration
+          instruction/condition reads from and writes to (see NightFrontMetadataPaths).  -->
+    <DataTemplate x:Key="NightFrontMetadataFileRow">
         <TextBlock
             Opacity="0.85"
             FontStyle="Italic"
-            Text="{Binding BaseName, StringFormat='Metadata file: {0}', TargetNullValue='Metadata file: (auto-detect)'}" />
+            Text="Metadata file: calibration.metadata.json" />
     </DataTemplate>
 
     <DataTemplate DataType="{x:Type local:NightFrontRotateToNextAngleInstruction}">
         <nina:SequenceBlockView>
             <nina:SequenceBlockView.SequenceItemContent>
-                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource NightFrontBaseNameRow}" />
+                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource NightFrontMetadataFileRow}" />
             </nina:SequenceBlockView.SequenceItemContent>
         </nina:SequenceBlockView>
     </DataTemplate>
@@ -207,7 +206,7 @@
         <nina:SequenceBlockView>
             <nina:SequenceBlockView.SequenceItemContent>
                 <StackPanel Orientation="Vertical">
-                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource NightFrontBaseNameRow}" />
+                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource NightFrontMetadataFileRow}" />
                     <WrapPanel Orientation="Horizontal">
                         <TextBlock Margin="5,0,0,0" VerticalAlignment="Center" Text="Min exposure" />
                         <ninactrl:UnitTextBox
@@ -273,7 +272,7 @@
         <nina:SequenceBlockView>
             <nina:SequenceBlockView.SequenceItemContent>
                 <StackPanel Orientation="Vertical">
-                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource NightFrontBaseNameRow}" />
+                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource NightFrontMetadataFileRow}" />
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Margin="5,0,0,0" VerticalAlignment="Center" Text="Amount" />
                         <ninactrl:UnitTextBox
@@ -299,7 +298,7 @@
     <DataTemplate DataType="{x:Type local:NightFrontWhileSameRotationCondition}">
         <nina:SequenceBlockView>
             <nina:SequenceBlockView.SequenceItemContent>
-                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource NightFrontBaseNameRow}" />
+                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource NightFrontMetadataFileRow}" />
             </nina:SequenceBlockView.SequenceItemContent>
         </nina:SequenceBlockView>
     </DataTemplate>
@@ -315,7 +314,7 @@
     <DataTemplate DataType="{x:Type local:NightFrontWhileCalibrationRemainsCondition}">
         <nina:SequenceBlockView>
             <nina:SequenceBlockView.SequenceItemContent>
-                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource NightFrontBaseNameRow}" />
+                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource NightFrontMetadataFileRow}" />
             </nina:SequenceBlockView.SequenceItemContent>
         </nina:SequenceBlockView>
     </DataTemplate>

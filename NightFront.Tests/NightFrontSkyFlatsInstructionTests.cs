@@ -64,7 +64,6 @@ namespace JeffRidder.NINA.Nightfront.Tests {
         [Fact]
         public void Clone_PreservesUserConfiguredProperties() {
             var instruction = CreateInstruction();
-            instruction.BaseName = "TargetsForTonight";
             instruction.MinExposure = 1;
             instruction.MaxExposure = 5;
             instruction.HistogramTargetPercentage = 0.5;
@@ -75,7 +74,6 @@ namespace JeffRidder.NINA.Nightfront.Tests {
             var clone = (NightFrontSkyFlatsInstruction)instruction.Clone();
 
             Assert.NotSame(instruction, clone);
-            Assert.Equal("TargetsForTonight", clone.BaseName);
             Assert.Equal(1, clone.MinExposure);
             Assert.Equal(5, clone.MaxExposure);
             Assert.Equal(0.5, clone.HistogramTargetPercentage);

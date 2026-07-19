@@ -27,7 +27,7 @@ namespace JeffRidder.NINA.Nightfront.Tests {
             var folder = CreateTempFolder();
             try {
                 Settings.Default.NightFrontDataFolder = folder;
-                var livePath = NightFrontMetadataPaths.GetLiveMetadataPath(folder, "TargetsForTonight");
+                var livePath = NightFrontMetadataPaths.GetLiveMetadataPath(folder);
 
                 NightFrontMetadataStore.TryAddCalibrationRequirement(livePath, "L", 179.9295654296875, -1, -1);
                 NightFrontMetadataStore.TryAddCalibrationRequirement(livePath, "B", 179.9295654296875, -1, -1);
@@ -74,7 +74,7 @@ namespace JeffRidder.NINA.Nightfront.Tests {
             try {
                 Settings.Default.NightFrontDataFolder = folder;
                 Settings.Default.FlatFilterOrder = "L, B";
-                var livePath = NightFrontMetadataPaths.GetLiveMetadataPath(folder, "TargetsForTonight");
+                var livePath = NightFrontMetadataPaths.GetLiveMetadataPath(folder);
 
                 NightFrontMetadataStore.TryAddCalibrationRequirement(livePath, "B", 179.97581481933594, -1, -1);
                 NightFrontMetadataStore.TryAddCalibrationRequirement(livePath, "L", 179.9295654296875, -1, -1);
@@ -133,7 +133,7 @@ namespace JeffRidder.NINA.Nightfront.Tests {
             var folder = CreateTempFolder();
             try {
                 Settings.Default.NightFrontDataFolder = folder;
-                var livePath = NightFrontMetadataPaths.GetLiveMetadataPath(folder, "TargetsForTonight");
+                var livePath = NightFrontMetadataPaths.GetLiveMetadataPath(folder);
                 NightFrontMetadataStore.TryAddCalibrationRequirement(livePath, "Ha", 90.0, -1, -1);
                 NightFrontMetadataStore.TryAddCalibrationRequirement(livePath, "L", 180.0, -1, -1);
 

@@ -64,7 +64,6 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
         private NightFrontSkyFlatsInstruction(NightFrontSkyFlatsInstruction copyMe)
             : this(copyMe.profileService, copyMe.cameraMediator, copyMe.telescopeMediator, copyMe.imagingMediator, copyMe.imageSaveMediator, copyMe.imageHistoryVM, copyMe.filterWheelMediator, copyMe.rotatorMediator, copyMe.twilightCalculator) {
             CopyMetaData(copyMe);
-            BaseName = copyMe.BaseName;
             MinExposure = copyMe.MinExposure;
             MaxExposure = copyMe.MaxExposure;
             HistogramTargetPercentage = copyMe.HistogramTargetPercentage;
@@ -101,7 +100,7 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
         }
 
         public override string ToString() {
-            return $"Category: {Category}, Item: {nameof(NightFrontSkyFlatsInstruction)}, BaseName: {BaseName}";
+            return $"Category: {Category}, Item: {nameof(NightFrontSkyFlatsInstruction)}";
         }
     }
 }

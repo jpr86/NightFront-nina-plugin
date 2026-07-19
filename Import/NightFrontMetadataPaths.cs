@@ -5,22 +5,27 @@ using System.Linq;
 namespace JeffRidder.NINA.Nightfront.Import {
 
     /// <summary>
-    /// Locates today's NightFront plan file and derives/resolves the calibration-metadata and
-    /// progress-snapshot sidecar file paths associated with it. Metadata is no longer tied to a
-    /// single night's dated plan filename (it accumulates across nights - see NightFrontMetadataStore),
-    /// so this is the one place that translates "today's dated plan file" into "the accumulating
-    /// metadata file for that plan family," and the one place that lets calibration-consuming
-    /// instructions/conditions find that same file without the user re-typing its name everywhere.
-    /// It's also the one place that knows about every kind of NightFront-written sidecar file, so
-    /// FindTodaysPlanFile can exclude all of them from its "what's the actual plan file" scan.
-    /// Also owns resolving the NightFront CLI's own path (ResolveCliPath/CoLocatedCliPath) - not a
-    /// sidecar of a plan file, but the same kind of "where does the plugin find a file it depends
-    /// on" logic this class already centralizes for everything else.
+    /// Locates today's NightFront plan file and resolves the various sidecar file paths that live
+    /// alongside it. Calibration metadata is a SINGLE, fixed-name, accumulating file
+    /// (<see cref="CalibrationMetadataFileName"/>) per data folder - never tied to a plan filename or
+    /// a date (see NightFrontMetadataStore). A date-derived name was tried and abandoned: it forked a
+    /// second, disconnected metadata file whenever a writer (Update/Replan) ran after local midnight,
+    /// because the stripped-out "today" token no longer matched the plan file's own (unchanging) night
+    /// date. So this is the one place that names that file, the one place that lets
+    /// calibration-consuming instructions/conditions find it without the user typing anything, and the
+    /// one place that knows about every kind of NightFront-written sidecar file so FindTodaysPlanFile
+    /// can exclude all of them from its "what's the actual plan file" scan. Also owns resolving the
+    /// NightFront CLI's own path (ResolveCliPath/CoLocatedCliPath) - not a sidecar of a plan file, but
+    /// the same kind of "where does the plugin find a file it depends on" logic this class already
+    /// centralizes for everything else.
     /// </summary>
     public static class NightFrontMetadataPaths {
         private const string LiveMetadataSuffix = ".metadata.json";
-        private const string ArchivedMetadataFileName = "archived.metadata.json";
-        private const string ReservedArchiveBaseName = "archived";
+
+        /// <summary>The single, fixed, undated filename every calibration-metadata read/write uses.
+        /// Deliberately not derived from the plan filename or the date - see this class's own summary
+        /// for the after-midnight forking bug that naming scheme caused.</summary>
+        public const string CalibrationMetadataFileName = "calibration.metadata.json";
 
         /// <summary>Suffix for a NightFrontProgressSnapshot sidecar file (see
         /// NightFrontProgressSnapshotWriter) - a second kind of NightFront-written sidecar that, like
@@ -112,95 +117,36 @@ namespace JeffRidder.NINA.Nightfront.Import {
             return Path.Combine(GetReplanHistoryFolder(folder), $"{timestamp:yyyyMMdd-HHmmss}_{originalFileName}");
         }
 
-        /// <summary>
-        /// Strips exactly one occurrence of <paramref name="todayToken"/> (plus at most one adjacent
-        /// '_'/'-' separator on each side) from <paramref name="planFileBaseName"/>, so the same
-        /// metadata file is reused every night a plan with that date substituted in is imported (e.g.
-        /// "TargetsForTonight_2026-07-06" with token "2026-07-06" -> "TargetsForTonight"). Not a
-        /// general date parser - matches the one concrete filename shape NightFrontApp's exporter
-        /// produces. Returns the base name unchanged if the token isn't found verbatim, and falls
-        /// back to "NightFront" if stripping would leave nothing or would leave the reserved
-        /// "archived" name (which collides with a legacy "archived.metadata.json" sidecar file that
-        /// may still be sitting in the folder from before metadata completion tracking moved into the
-        /// single live file - see GetLiveMetadataPath).
-        /// </summary>
-        public static string DeriveStableBaseName(string planFileBaseName, string todayToken) {
-            if (string.IsNullOrEmpty(planFileBaseName) || string.IsNullOrEmpty(todayToken)) {
-                return planFileBaseName;
-            }
-
-            var idx = planFileBaseName.IndexOf(todayToken, StringComparison.Ordinal);
-            if (idx < 0) {
-                return planFileBaseName;
-            }
-
-            var before = planFileBaseName.Substring(0, idx);
-            var after = planFileBaseName.Substring(idx + todayToken.Length);
-            if (before.Length > 0 && (before[before.Length - 1] == '_' || before[before.Length - 1] == '-')) {
-                before = before.Substring(0, before.Length - 1);
-            }
-            if (after.Length > 0 && (after[0] == '_' || after[0] == '-')) {
-                after = after.Substring(1);
-            }
-
-            var stable = before + after;
-            if (string.IsNullOrEmpty(stable) || string.Equals(stable, ReservedArchiveBaseName, StringComparison.OrdinalIgnoreCase)) {
-                return "NightFront";
-            }
-            return stable;
-        }
-
-        /// <summary>Builds the live metadata path for <paramref name="baseName"/>. Throws if
-        /// <paramref name="baseName"/> is the reserved "archived" name, which would otherwise resolve
-        /// to the same path as a legacy "archived.metadata.json" sidecar file that older plugin
-        /// versions wrote (see IsArchiveFile) and corrupt it.</summary>
-        public static string GetLiveMetadataPath(string folder, string baseName) {
-            if (string.Equals(baseName, ReservedArchiveBaseName, StringComparison.OrdinalIgnoreCase)) {
-                throw new ArgumentException("\"archived\" cannot be used as a NightFront calibration-metadata name - it collides with the shared archived.metadata.json file. Choose a different name.", nameof(baseName));
-            }
-            return Path.Combine(folder, baseName + LiveMetadataSuffix);
+        /// <summary>The single, fixed calibration-metadata path in <paramref name="folder"/>. Used by
+        /// both writers (NightFrontUpdateInstruction/NightFrontReplanInstruction, where the file may
+        /// not exist yet - the store creates it on first write) and consumers. No base name, no date,
+        /// no per-plan-family variation - see this class's summary.</summary>
+        public static string GetLiveMetadataPath(string folder) {
+            return Path.Combine(folder, CalibrationMetadataFileName);
         }
 
         /// <summary>
-        /// Resolves which live metadata file a calibration-consuming instruction/condition should
-        /// use. <paramref name="explicitBaseName"/> wins verbatim if set (rejected via
-        /// <paramref name="issue"/> if it's the reserved "archived" name). Otherwise scans the folder
-        /// for "*.metadata.json" files (excluding a legacy "archived.metadata.json" sidecar file, if
-        /// one is still present from before completion tracking moved into the single live file):
-        /// exactly one match resolves automatically; zero or more than one leaves
-        /// <paramref name="issue"/> populated with a message naming the candidates (or noting none
-        /// exist) and returns null.
+        /// Resolves the calibration-metadata path for a calibration-consuming instruction/condition,
+        /// returning null (with a human-readable <paramref name="issue"/>) if the folder isn't
+        /// configured/missing or the file doesn't exist yet. "Doesn't exist yet" is a normal state -
+        /// no images have been collected, so nothing has written the file - and callers are expected to
+        /// exit gracefully with the message rather than treat it as an error.
         /// </summary>
-        public static string ResolveBaseName(string folder, string explicitBaseName, out string issue) {
+        public static string ResolveExistingMetadataPath(string folder, out string issue) {
             issue = null;
-
-            if (!string.IsNullOrWhiteSpace(explicitBaseName)) {
-                if (string.Equals(explicitBaseName, ReservedArchiveBaseName, StringComparison.OrdinalIgnoreCase)) {
-                    issue = "\"archived\" cannot be used as a NightFront calibration-metadata name - it collides with the shared archived.metadata.json file. Choose a different name.";
-                    return null;
-                }
-                return explicitBaseName;
-            }
 
             if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder)) {
                 issue = "The NightFront data folder is not configured or does not exist.";
                 return null;
             }
 
-            var candidates = Directory.EnumerateFiles(folder, "*" + LiveMetadataSuffix)
-                .Where(f => !IsArchiveFile(f))
-                .Select(f => Path.GetFileName(f).Substring(0, Path.GetFileName(f).Length - LiveMetadataSuffix.Length))
-                .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            if (candidates.Count == 1) {
-                return candidates[0];
+            var path = GetLiveMetadataPath(folder);
+            if (!File.Exists(path)) {
+                issue = $"No calibration metadata file ({CalibrationMetadataFileName}) exists yet in the NightFront data folder.";
+                return null;
             }
 
-            issue = candidates.Count == 0
-                ? "No calibration metadata file was found in the NightFront data folder."
-                : $"Multiple calibration metadata files found in the NightFront data folder; set a specific name to disambiguate: {string.Join(", ", candidates)}.";
-            return null;
+            return path;
         }
 
         /// <summary>The nightfront-cli.exe path NightFrontApp's build.gradle.kts (graalvmNative,
@@ -248,14 +194,6 @@ namespace JeffRidder.NINA.Nightfront.Import {
 
         private static bool IsSessionConfigFile(string path) {
             return string.Equals(Path.GetFileName(path), SessionConfigFileName, StringComparison.OrdinalIgnoreCase);
-        }
-
-        /// <summary>NightFront no longer writes this file itself - completed calibration requirements
-        /// stay in the live file with FlatsCompletedDate stamped instead of being archived elsewhere.
-        /// This only guards against a leftover "archived.metadata.json" from an older plugin version
-        /// being misdetected as a live metadata candidate.</summary>
-        private static bool IsArchiveFile(string path) {
-            return string.Equals(Path.GetFileName(path), ArchivedMetadataFileName, StringComparison.OrdinalIgnoreCase);
         }
     }
 }

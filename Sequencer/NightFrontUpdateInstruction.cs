@@ -203,10 +203,9 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
                 // Watches the imported TakeExposure instructions as the night's imaging actually
                 // runs and writes the metadata file itself once each exposure finishes - see
                 // NightFrontMetadataRecorder for why this can't be done up front from the plan. The
-                // base name is derived from today's date stripped out of the plan filename, so the
-                // same metadata file accumulates across nights instead of one file per plan.
-                var baseName = NightFrontMetadataPaths.DeriveStableBaseName(Path.GetFileNameWithoutExtension(matchedFile), todayToken);
-                var livePath = NightFrontMetadataPaths.GetLiveMetadataPath(folder, baseName);
+                // metadata file is a single fixed-name, undated file that accumulates across nights
+                // (see NightFrontMetadataPaths).
+                var livePath = NightFrontMetadataPaths.GetLiveMetadataPath(folder);
 
                 // Once-per-run housekeeping: drop calibration requirements that were completed long
                 // enough ago to need reshooting. If the underlying target/filter/rotation combo is

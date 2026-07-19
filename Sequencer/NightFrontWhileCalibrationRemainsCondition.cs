@@ -27,26 +27,16 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
 
         private NightFrontWhileCalibrationRemainsCondition(NightFrontWhileCalibrationRemainsCondition copyMe) : this() {
             CopyMetaData(copyMe);
-            BaseName = copyMe.BaseName;
         }
-
-        /// <summary>Which calibration-metadata file to read. Blank auto-detects the single
-        /// "*.metadata.json" file in the configured NightFront data folder.</summary>
-        [JsonProperty]
-        public string BaseName { get; set; } = "";
 
         public override bool Check(ISequenceItem previousItem, ISequenceItem nextItem) {
             var folder = Settings.Default.NightFrontDataFolder;
-            if (string.IsNullOrWhiteSpace(folder)) {
+            var livePath = NightFrontMetadataPaths.ResolveExistingMetadataPath(folder, out _);
+            if (livePath == null) {
+                // No metadata file yet - nothing to loop over, so stop.
                 return false;
             }
 
-            var resolvedBaseName = NightFrontMetadataPaths.ResolveBaseName(folder, BaseName, out _);
-            if (resolvedBaseName == null) {
-                return false;
-            }
-
-            var livePath = NightFrontMetadataPaths.GetLiveMetadataPath(folder, resolvedBaseName);
             var filterOrder = NightFrontFilterOrder.Parse(Settings.Default.FlatFilterOrder);
             return NightFrontMetadataStore.PeekNext(livePath, filterOrder) != null;
         }
@@ -56,7 +46,7 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
         }
 
         public override string ToString() {
-            return $"Category: {Category}, Condition: {nameof(NightFrontWhileCalibrationRemainsCondition)}, BaseName: {BaseName}";
+            return $"Category: {Category}, Condition: {nameof(NightFrontWhileCalibrationRemainsCondition)}";
         }
     }
 }
