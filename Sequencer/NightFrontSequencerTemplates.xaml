@@ -409,4 +409,65 @@
     <DataTemplate x:Key="JeffRidder.NINA.Nightfront.Sequencer.NightFrontSeeingTrigger_Mini">
         <mini:MiniTrigger />
     </DataTemplate>
+
+    <!--  Before Target / After Target: fire around each NightFront-planned target
+          (NightFrontTargetTriggerBase) and run whatever instructions the user drops below - same
+          TriggerRunner drop-area pattern as the Seeing Trigger above (DIYMeridianFlipTrigger's
+          DragOverBehavior/DropIntoBehavior wiring), but with no threshold/comparator fields of their
+          own - just a live target/status readout. Shared as one content template since both triggers
+          render identically (mirrors the NightFrontMetadataFileRow reuse pattern above).  -->
+    <DataTemplate x:Key="NightFrontTargetTriggerStatusRow">
+        <StackPanel Orientation="Vertical">
+            <TextBlock
+                FontStyle="Italic"
+                Opacity="0.85"
+                Text="{Binding StatusMessage}" />
+            <Border
+                MinHeight="35"
+                Margin="0,6,0,0"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1">
+                <Grid Background="{StaticResource BackgroundBrush}" DataContext="{Binding TriggerRunner}">
+                    <ItemsControl MinHeight="35" ItemsSource="{Binding Items}" />
+                    <TextBlock
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        FontStyle="Italic"
+                        Opacity="0.4"
+                        Text="Instructions will go here..."
+                        Visibility="{Binding Items.Count, Converter={StaticResource InverseZeroToVisibilityConverter}}" />
+                    <i:Interaction.Behaviors>
+                        <behaviors:DragOverBehavior DragAboveSize="0" DragBelowSize="0" />
+                        <behaviors:DropIntoBehavior
+                            AllowedDragDropTypesString="NINA.Sequencer.Container.ISequenceContainer;NINA.Sequencer.SequenceItem.ISequenceItem;NINA.Sequencer.TemplatedSequenceContainer"
+                            OnDropCommand="DropIntoCommand" />
+                    </i:Interaction.Behaviors>
+                </Grid>
+            </Border>
+        </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type local:NightFrontBeforeTargetTrigger}">
+        <nina:SequenceBlockView>
+            <nina:SequenceBlockView.SequenceItemContent>
+                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource NightFrontTargetTriggerStatusRow}" />
+            </nina:SequenceBlockView.SequenceItemContent>
+        </nina:SequenceBlockView>
+    </DataTemplate>
+
+    <DataTemplate x:Key="JeffRidder.NINA.Nightfront.Sequencer.NightFrontBeforeTargetTrigger_Mini">
+        <mini:MiniTrigger />
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type local:NightFrontAfterTargetTrigger}">
+        <nina:SequenceBlockView>
+            <nina:SequenceBlockView.SequenceItemContent>
+                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource NightFrontTargetTriggerStatusRow}" />
+            </nina:SequenceBlockView.SequenceItemContent>
+        </nina:SequenceBlockView>
+    </DataTemplate>
+
+    <DataTemplate x:Key="JeffRidder.NINA.Nightfront.Sequencer.NightFrontAfterTargetTrigger_Mini">
+        <mini:MiniTrigger />
+    </DataTemplate>
 </ResourceDictionary>

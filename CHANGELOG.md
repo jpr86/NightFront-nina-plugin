@@ -1,5 +1,19 @@
 ﻿# NightFront
 
+## Unreleased
+- Added "Before Target" and "After Target," two new sequence triggers that fire around each
+  NightFront-planned target and run whatever instructions you drop into them - e.g. a Ground
+  Station send announcing the target starting/finishing. "Before Target" fires just before a
+  target's own slew/centering; "After Target" fires once it's done (completed, skipped, or
+  failed), including after the very last target of the night. Both re-parent their action
+  container onto the firing target for the duration of the run, so Ground Station's own
+  `$$TARGET_NAME$$`/`$$TARGET_RA$$`/`$$TARGET_DEC$$` tokens resolve correctly - previously
+  impossible from outside the NightFront Container, since Ground Station only looks upward for a
+  target and everything NightFront imports lives below the container. Place either on the
+  NightFront Container itself or one of its ancestors (e.g. the same branch as "Loop while safe"),
+  not a sibling branch such as "Once Safe" - Validate() now warns if it can't see any targets from
+  where it's placed.
+
 ## 1.3.5.0
 - Version-only bump to align with NightFront app v1.3.5. The app change this release is GUI-only
   (a moon-brightness bar added to the nightly-plan forecast display, plus code-review fixes to it),

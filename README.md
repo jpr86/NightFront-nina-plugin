@@ -32,6 +32,12 @@ of that night's schedule, rather than only ever replaying a plan decided before 
    actually crosses your threshold. It's edge-triggered (fires on the transition, not on every
    sample) with a re-arm window, so a persistently good or bad spell still produces a fresh
    replan periodically rather than firing once and going quiet.
+6. **Before Target** and **After Target** triggers fire right around each target's own
+   slew/centering — "before" just ahead of it, "after" once the target is done (however it
+   ended), including after the night's last target. Drop in whatever you like, such as a Ground
+   Station send announcing the target starting or finishing; `$$TARGET_NAME$$`/`$$TARGET_RA$$`/
+   `$$TARGET_DEC$$` resolve correctly because the trigger's action container is re-parented onto
+   the live target for the duration of the run.
 
 ## Relationship to NINA Target Scheduler
 
