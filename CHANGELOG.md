@@ -1,5 +1,29 @@
 ﻿# NightFront
 
+## 1.4.0.0
+- Aligns with NightFront app v1.4.0. No C# changed in this plugin, but - like 1.3.4.0 and unlike the
+  version-only bumps - the `nightfront-cli.exe` deployed alongside it (what Replan shells out to)
+  did, so **Replan produces different schedules this release**. Both of the scheduler's fitness
+  objectives were reworked:
+  - A filter with nothing left to shoot (Accepted >= Planned) no longer counts toward its target's
+    feasible imaging window. Such a filter usually carries no moon-avoidance profile, so it stayed
+    "feasible" long after the target's real filters were moon-blocked, manufacturing a window
+    nothing could fill and pinning that target's score at zero for every candidate schedule.
+  - Targets that cannot be imaged at all tonight - fully moon-blocked, or never high enough - are
+    now excluded from the utilization average rather than averaged in as zero. No schedule can
+    change whether they are feasible, so they only compressed the score's usable range.
+  - The quality axis is now a convex blend of airmass and filter-preference satisfaction, bounded
+    to 0-1. It was previously airmass multiplied by a preference boost, which could exceed 1 and
+    let a preference rule that matches every hour act as a constant scale factor rather than
+    something a schedule is actually rewarded for satisfying. Airmass still dominates; preferences
+    nudge and break ties.
+- **Scores are not comparable to previous releases.** A schedule that reported utilization 0.33
+  before will report roughly 0.43 for the same plan, and quality now reads below 1 rather than
+  above it. The numbers moved, not the underlying quality.
+- The desktop app also gained a per-filter, per-night feasibility diagnosis (which targets and
+  filters can actually be imaged, and why not, on each forecast night). That is app-only - it does
+  not affect the plan JSON this plugin imports.
+
 ## 1.3.6.0
 - Added "Before Target" and "After Target," two new sequence triggers that fire around each
   NightFront-planned target and run whatever instructions you drop into them - e.g. a Ground
