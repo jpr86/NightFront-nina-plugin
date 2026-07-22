@@ -1,6 +1,6 @@
 ﻿# NightFront
 
-## Unreleased
+## 1.3.6.0
 - Added "Before Target" and "After Target," two new sequence triggers that fire around each
   NightFront-planned target and run whatever instructions you drop into them - e.g. a Ground
   Station send announcing the target starting/finishing. "Before Target" fires just before a
@@ -13,6 +13,9 @@
   NightFront Container itself or one of its ancestors (e.g. the same branch as "Loop while safe"),
   not a sibling branch such as "Once Safe" - Validate() now warns if it can't see any targets from
   where it's placed.
+- Aligns with NightFront app v1.3.6. The app change this release is GUI-only (the GA convergence
+  charts on the nightly and long-range plan pages moved into a collapsed "Diagnostics" disclosure at
+  the bottom of each page), so the `nightfront-cli.exe` Replan shells out to unchanged behavior.
 
 ## 1.3.5.0
 - Version-only bump to align with NightFront app v1.3.5. The app change this release is GUI-only
