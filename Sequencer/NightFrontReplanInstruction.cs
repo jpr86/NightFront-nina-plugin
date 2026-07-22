@@ -28,11 +28,12 @@ using System.Windows;
 namespace JeffRidder.NINA.Nightfront.Sequencer {
 
     /// <summary>
-    /// The primary mechanism from todos/nina-safety-delay-plan.md's Phase 3: placed by the user
-    /// once inside (or immediately after) the "Once Safe" branch of their own template - the point
-    /// their sequence *already* falls back to on recovery from a safety-monitor interruption, right
-    /// before control returns to the top of "Loop while safe" (see the plan doc's Finding 3 for why
-    /// that native restart-from-top behavior is exactly what makes this insertion point safe: by
+    /// The primary mechanism from NightFrontApp's docs/DESIGN.md § Safety-Recovery Replan, Phase 3:
+    /// placed by the user once inside (or immediately after) the "Once Safe" branch of their own
+    /// template - the point their sequence *already* falls back to on recovery from a safety-monitor
+    /// interruption, right before control returns to the top of "Loop while safe" (see that same
+    /// section for why the native restart-from-top behavior is exactly what makes this insertion
+    /// point safe: by
     /// the time this instruction runs, nothing inside "Loop while safe" - including the real
     /// NightFrontContainer - is executing). On execution it:
     /// 1. Finds NightFrontContainer anywhere in the sequence (see NightFrontContainer.FindAnywhere -
@@ -97,7 +98,8 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
         /// replan-specific ReplanEffortPreset family (NightFront's optimizer/ReplanEffortPreset.kt)
         /// was already fine-tuned by sweep so that its Fast tier is the right unattended budget for
         /// the modest imaging-PC hardware NINA runs on overnight — a user-overridable dropdown only
-        /// threatened to undo that tuning. See CLAUDE.md and the plan doc's Phase 2 notes.</summary>
+        /// threatened to undo that tuning. See CLAUDE.md and NightFrontApp's docs/DESIGN.md
+        /// § Safety-Recovery Replan.</summary>
         public const string ReplanEffortLevel = "Fast";
 
         private readonly IProfileService profileService;

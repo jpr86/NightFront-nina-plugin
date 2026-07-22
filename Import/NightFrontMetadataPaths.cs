@@ -81,9 +81,10 @@ namespace JeffRidder.NINA.Nightfront.Import {
         /// <summary>Builds the progress-snapshot path for <paramref name="baseName"/> (typically the
         /// same date-stamped base name as the plan file it was captured from - see
         /// NightFrontJsonImporter/NightFrontUpdateInstruction). Intended as the one place a future
-        /// caller (Phase 3's NightFrontReplanInstruction - see todos/nina-safety-delay-plan.md) derives
-        /// where to write a NightFrontProgressSnapshot, rather than inventing an ad hoc path that
-        /// FindTodaysPlanFile's exclusion filter above wouldn't recognize.</summary>
+        /// caller (Phase 3's NightFrontReplanInstruction - see NightFrontApp's docs/DESIGN.md §
+        /// Safety-Recovery Replan) derives where to write a NightFrontProgressSnapshot, rather than
+        /// inventing an ad hoc path that FindTodaysPlanFile's exclusion filter above wouldn't
+        /// recognize.</summary>
         public static string GetProgressSnapshotPath(string folder, string baseName) {
             return Path.Combine(folder, baseName + ProgressSnapshotSuffix);
         }

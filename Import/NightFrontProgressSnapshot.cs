@@ -8,9 +8,10 @@ namespace JeffRidder.NINA.Nightfront.Import {
     /// top-level target in a NightFrontContainer. Built by NightFrontContainer.BuildProgressSnapshot
     /// from NightFrontTargetSummary's already-live PlannedCount/CompletedCount/Status - this adds no
     /// new progress-tracking mechanism of its own, only a serializable view of data the sequencer
-    /// UI's per-target summary rows already compute (see todos/nina-safety-delay-plan.md, Finding 7 /
-    /// Phase 1). Intended to be handed to a future safety-recovery replan step (Phase 3) so a
-    /// remainder-of-night re-solve knows what's already been shot.
+    /// UI's per-target summary rows already compute (see NightFrontApp's docs/DESIGN.md §
+    /// Safety-Recovery Replan, Finding 7 / Phase 1). Intended to be handed to a future
+    /// safety-recovery replan step (Phase 3) so a remainder-of-night re-solve knows what's already
+    /// been shot.
     ///
     /// CompletedCount/PlannedCount are per-target totals, not broken down by filter - the same
     /// granularity NightFrontTargetSummary itself tracks today. A consumer that needs a per-filter

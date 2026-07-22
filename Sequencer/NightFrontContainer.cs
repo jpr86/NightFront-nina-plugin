@@ -149,9 +149,10 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
 
         /// <summary>
         /// Builds a point-in-time snapshot of PlannedCount/CompletedCount/Status for every target row
-        /// in TargetSummaries (todos/nina-safety-delay-plan.md, Finding 7 / Phase 1) - the
-        /// already-live progress data a future safety-recovery replan step (Phase 3) can serialize
-        /// alongside a live weather reading and hand to a NightFront CLI remainder-of-night re-solve.
+        /// in TargetSummaries (NightFrontApp's docs/DESIGN.md § Safety-Recovery Replan, Finding 7 /
+        /// Phase 1) - the already-live progress data a future safety-recovery replan step (Phase 3)
+        /// can serialize alongside a live weather reading and hand to a NightFront CLI
+        /// remainder-of-night re-solve.
         /// Reads TargetSummaries on the UI thread, same as RebuildTargetSummaries - the intended
         /// caller (a future Phase 3 sequence instruction's Execute) runs off the UI thread like any
         /// other NINA sequence item, and TargetSummaries is the same WPF-bound ObservableCollection

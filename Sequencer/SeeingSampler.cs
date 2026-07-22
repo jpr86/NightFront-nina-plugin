@@ -23,9 +23,9 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
     /// Fetch step a NightFrontSeeingTrigger runs on each poll: resolve a seeing-monitor image from
     /// a configured data-source URL (either the image itself, or an HTML page it's embedded in),
     /// download it, and OCR the rendered numeric readout out of it. Verified against the real
-    /// hcronewmexico.com/telemetry/ Alcor seeing-monitor image (see the plan doc's prototype
-    /// results) - the source images are small, high-contrast rendered-text panels, not photos, so
-    /// Tesseract reads them reliably with no preprocessing.
+    /// hcronewmexico.com/telemetry/ Alcor seeing-monitor image by prototype before being built out -
+    /// the source images are small, high-contrast rendered-text panels, not photos, so Tesseract
+    /// reads them reliably with no preprocessing.
     /// </summary>
     public static class SeeingSampler {
         private static readonly HttpClient Http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };

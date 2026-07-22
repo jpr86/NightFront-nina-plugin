@@ -8,9 +8,9 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
 
     /// <summary>
     /// Fires right after a target inside the NightFront Container finishes - however it ended
-    /// (completed, skipped, or failed) - before the sequence moves on to the next item
-    /// (todos/nina-target-broadcast-plan.md). Fires even for the very last target of the night:
-    /// NINA's own SequentialStrategy calls RunTriggersAfter one final time with `nextItem == null`
+    /// (completed, skipped, or failed) - before the sequence moves on to the next item. Fires even
+    /// for the very last target of the night: NINA's own SequentialStrategy calls RunTriggersAfter
+    /// one final time with `nextItem == null`
     /// once GetNextItem finds nothing left. Runs whatever instructions the user drops below -
     /// typically a Ground Station send using $$TARGET_NAME$$, which resolves because
     /// NightFrontTargetTriggerBase.Execute re-parents TriggerRunner onto the target's own

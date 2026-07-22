@@ -1,8 +1,8 @@
 @echo off
-REM Builds the NightFront CLI as a native-image executable (todos/nina-safety-delay-plan.md,
-REM CLI-deployment hardening) and copies it alongside the plugin DLL in NINA's plugin folder, so
-REM NightFrontReplanInstruction can find it at a known, co-located path with no user-configured
-REM NightFrontCliPath required.
+REM Builds the NightFront CLI as a native-image executable (NightFrontApp's docs/DESIGN.md §
+REM Safety-Recovery Replan, CLI-deployment hardening) and copies it alongside the plugin DLL in
+REM NINA's plugin folder, so NightFrontReplanInstruction can find it at a known, co-located path
+REM with no user-configured NightFrontCliPath required.
 REM
 REM %1 = the plugin's installed output folder (%%localappdata%%\NINA\Plugins\3.0.0\$(TargetName))
 REM

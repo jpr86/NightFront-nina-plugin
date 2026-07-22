@@ -12,9 +12,9 @@ using System.Windows;
 namespace JeffRidder.NINA.Nightfront.Sequencer {
 
     /// <summary>
-    /// Shared base for the "Before Target" and "After Target" triggers
-    /// (todos/nina-target-broadcast-plan.md). Both fire around a target's own DeepSkyObjectContainer
-    /// as NightFront's imported plan executes inside the NightFront Container, running whatever
+    /// Shared base for the "Before Target" and "After Target" triggers. Both fire around a target's
+    /// own DeepSkyObjectContainer as NightFront's imported plan executes inside the NightFront
+    /// Container, running whatever
     /// instructions the user drops into TriggerRunner - the same generic condition-to-action bridge
     /// NightFrontSeeingTrigger already uses, minus its background poller: these read
     /// ShouldTrigger/ShouldTriggerAfter's own previousItem/nextItem arguments directly instead of a

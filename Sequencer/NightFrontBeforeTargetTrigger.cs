@@ -10,9 +10,9 @@ namespace JeffRidder.NINA.Nightfront.Sequencer {
     /// Fires just before a target inside the NightFront Container starts - before that target's own
     /// slew/centering, since CenterAndRotate runs inside the target's own DeepSkyObjectContainer.
     /// "Starting M31" therefore precedes the first photon by minutes and still fires even if
-    /// centering later fails; that's the right meaning for "target begins"
-    /// (todos/nina-target-broadcast-plan.md). Runs whatever instructions the user drops below -
-    /// typically a Ground Station send using $$TARGET_NAME$$/$$TARGET_RA$$/$$TARGET_DEC$$, which
+    /// centering later fails; that's the right meaning for "target begins". Runs whatever
+    /// instructions the user drops below - typically a Ground Station send using
+    /// $$TARGET_NAME$$/$$TARGET_RA$$/$$TARGET_DEC$$, which
     /// resolve because NightFrontTargetTriggerBase.Execute re-parents TriggerRunner onto the target's
     /// own DeepSkyObjectContainer for the duration of the run.
     ///

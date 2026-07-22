@@ -9,10 +9,11 @@ namespace JeffRidder.NINA.Nightfront.Import {
     /// Writes a NightFrontProgressSnapshot to disk as its own single-purpose JSON file. Unlike
     /// NightFrontMetadataStore's accumulating, multi-writer calibration file, a progress snapshot is
     /// produced fresh and whole by a single writer each time it's needed (a future safety-recovery
-    /// replan step - see todos/nina-safety-delay-plan.md Phase 3), so no read-modify-write locking is
-    /// needed here. Callers should derive <c>path</c> via NightFrontMetadataPaths.GetProgressSnapshotPath
-    /// rather than inventing their own - that's the one place FindTodaysPlanFile's "what's the actual
-    /// plan file" scan is kept in sync with every kind of NightFront-written sidecar file, so a
+    /// replan step - see NightFrontApp's docs/DESIGN.md § Safety-Recovery Replan, Phase 3), so no
+    /// read-modify-write locking is needed here. Callers should derive <c>path</c> via
+    /// NightFrontMetadataPaths.GetProgressSnapshotPath rather than inventing their own - that's the
+    /// one place FindTodaysPlanFile's "what's the actual plan file" scan is kept in sync with every
+    /// kind of NightFront-written sidecar file, so a
     /// snapshot written to an unrecognized name/location risks being misidentified as a plan file.
     /// </summary>
     public static class NightFrontProgressSnapshotWriter {
