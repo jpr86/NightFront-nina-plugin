@@ -1,5 +1,16 @@
 ﻿# NightFront
 
+## 1.4.1.0
+- Aligns with NightFront app v1.4.1. No C# changed, but the `nightfront-cli.exe` deployed alongside
+  this plugin did, so **Replan picks a different plan this release** in one specific case: when no
+  `selection.json` sidecar exists (you have never picked a point on the Pareto chart for this
+  config), Replan's automatic choice used to land on an extreme of the front - typically the plan
+  with the most imaging time and the worst average airmass, or the reverse, depending on nothing
+  more than iteration order. It now picks the balanced compromise: the plan whose *worse* of the two
+  objectives is as good as possible.
+- If you HAVE chosen a point in the app and exported it, nothing changes - Replan still reproduces
+  your recorded utilization-vs-quality tradeoff, exactly as before.
+
 ## 1.4.0.0
 - Aligns with NightFront app v1.4.0. No C# changed in this plugin, but - like 1.3.4.0 and unlike the
   version-only bumps - the `nightfront-cli.exe` deployed alongside it (what Replan shells out to)
