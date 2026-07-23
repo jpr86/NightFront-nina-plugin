@@ -1,5 +1,16 @@
 ﻿# NightFront
 
+## 1.5.0.0
+- Aligns with NightFront app v1.5.0. No C# changed, but the `nightfront-cli.exe` deployed alongside
+  this plugin did, so **Replan runs faster this release** — its genetic-algorithm fitness evaluation
+  is now parallelized across the CPU's cores (via kEvolve's `MTSimpleProblem`) instead of being
+  evaluated one candidate schedule at a time. On a multi-core imaging PC this shortens the replan
+  solve noticeably.
+- **The plan Replan produces is unchanged.** Only the per-candidate fitness evaluation is threaded;
+  breeding, elitism, and Pareto ranking stay single-threaded, so the algorithm's dynamics — and thus
+  the schedule it converges on for a given config — are identical to 1.4.1. This is a speed change,
+  not a scheduling change, and scores remain comparable to the previous release.
+
 ## 1.4.1.0
 - Aligns with NightFront app v1.4.1. No C# changed, but the `nightfront-cli.exe` deployed alongside
   this plugin did, so **Replan picks a different plan this release** in one specific case: when no
